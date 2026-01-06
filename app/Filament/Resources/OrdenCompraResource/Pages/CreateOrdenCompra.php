@@ -4,6 +4,7 @@ namespace App\Filament\Resources\OrdenCompraResource\Pages;
 
 use App\Filament\Resources\OrdenCompraResource;
 use App\Services\OrdenCompraSyncService;
+use Filament\Actions\Action;
 use Filament\Resources\Pages\CreateRecord;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\DB;
@@ -13,10 +14,16 @@ class CreateOrdenCompra extends CreateRecord
 {
     protected static string $resource = OrdenCompraResource::class;
 
+    protected function getCreateFormAction(): Action
+    {
+        return parent::getCreateFormAction()
+            ->label('Crear e Imprimir')
+            ->icon('heroicon-o-printer');
+    }
 
     protected function getRedirectUrl(): string
     {
-        return $this->getResource()::getUrl('index');
+        return route('orden-compra.pdf', $this->record);
     }
 
     protected function getListeners(): array
@@ -70,9 +77,15 @@ class CreateOrdenCompra extends CreateRecord
             return;
         }
 
+        $pedidosImportados = array_values(array_unique(array_merge(
+            $this->data['pedidos_importados_ids'] ?? [],
+            $pedidos
+        )));
+
+        $this->data['pedidos_importados_ids'] = $pedidosImportados;
         $this->data['pedidos_importados'] = implode(', ', array_map(
             fn($pedi) => str_pad($pedi, 8, "0", STR_PAD_LEFT),
-            $pedidos
+            $pedidosImportados
         ));
 
         $connectionName = OrdenCompraResource::getExternalConnectionName($connectionId);
@@ -172,7 +185,7 @@ class CreateOrdenCompra extends CreateRecord
         }
 
         // Use a more specific event name if needed, or just close the generic modal
-        $this->dispatch('close-modal', id: 'filtrar-pedidos');
+        $this->dispatch('close-modal');
     }
 
 }

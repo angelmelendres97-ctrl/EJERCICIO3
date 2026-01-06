@@ -19,6 +19,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Collection;
 use Filament\Actions\StaticAction;
 use Filament\Notifications\Notification;
+use Illuminate\Support\Carbon;
 
 class BuscarPedidosCompra extends Component implements HasForms, HasTable
 {
@@ -28,6 +29,7 @@ class BuscarPedidosCompra extends Component implements HasForms, HasTable
     public $id_empresa;
     public $amdg_id_empresa;
     public $amdg_id_sucursal;
+    public array $pedidos_importados = [];
 
     public ?array $data = [];
 
@@ -38,15 +40,16 @@ class BuscarPedidosCompra extends Component implements HasForms, HasTable
         }
     }
 
-    public function mount($id_empresa, $amdg_id_empresa, $amdg_id_sucursal): void
+    public function mount($id_empresa, $amdg_id_empresa, $amdg_id_sucursal, $pedidos_importados = []): void
     {
         $this->initializeForm();
         $this->id_empresa = $id_empresa;
         $this->amdg_id_empresa = $amdg_id_empresa;
         $this->amdg_id_sucursal = $amdg_id_sucursal;
+        $this->pedidos_importados = is_array($pedidos_importados) ? $pedidos_importados : [];
 
         $this->form->fill([
-            'fecha_desde' => now()->startOfDay(),
+            'fecha_desde' => Carbon::create(2026, 1, 1)->startOfDay(),
             'fecha_hasta' => now()->endOfDay(),
         ]);
     }
@@ -120,6 +123,10 @@ class BuscarPedidosCompra extends Component implements HasForms, HasTable
                 $formData['fecha_hasta']
             ]);
         }
+
+        if (!empty($this->pedidos_importados)) {
+            $query->whereNotIn('saepedi.pedi_cod_pedi', $this->pedidos_importados);
+        }
         return $query;
     }
 
@@ -132,15 +139,26 @@ class BuscarPedidosCompra extends Component implements HasForms, HasTable
                 Tables\Columns\TextColumn::make('pedi_cod_pedi')
                     ->label('Secuencial')
                     ->searchable()
-                    ->sortable()
+                    ->sortable(query: fn(Builder $query, string $direction) => $query->orderBy('saepedi.pedi_cod_pedi', $direction))
                     ->formatStateUsing(
                         fn($state, $record) =>
                         str_pad($record->pedi_cod_pedi, 8, "0", STR_PAD_LEFT)
                     ),
-                Tables\Columns\TextColumn::make('pedi_res_pedi')->label('Responsable')->searchable()->sortable(),
-                Tables\Columns\TextColumn::make('pedi_det_pedi')->label('Motivo')->searchable()->wrap(),
-                Tables\Columns\TextColumn::make('pedi_fec_pedi')->label('Fecha Pedido')->date()->sortable(),
+                Tables\Columns\TextColumn::make('pedi_res_pedi')
+                    ->label('Responsable')
+                    ->searchable()
+                    ->sortable(query: fn(Builder $query, string $direction) => $query->orderBy('saepedi.pedi_res_pedi', $direction)),
+                Tables\Columns\TextColumn::make('pedi_det_pedi')
+                    ->label('Motivo')
+                    ->searchable()
+                    ->sortable(query: fn(Builder $query, string $direction) => $query->orderBy('saepedi.pedi_det_pedi', $direction))
+                    ->wrap(),
+                Tables\Columns\TextColumn::make('pedi_fec_pedi')
+                    ->label('Fecha Pedido')
+                    ->date()
+                    ->sortable(query: fn(Builder $query, string $direction) => $query->orderBy('saepedi.pedi_fec_pedi', $direction)),
             ])
+            ->defaultSort('saepedi.pedi_fec_pedi', 'desc')
             ->actions([
                 Tables\Actions\Action::make('view_details')
                     ->label('Ver Detalle')
@@ -186,6 +204,7 @@ class BuscarPedidosCompra extends Component implements HasForms, HasTable
 
                         // 🔥 CERRAR MODAL 100% SEGURO
                         $action->cancel();
+                        $this->dispatch('close-modal');
                     })
             ]);
 
