@@ -283,17 +283,20 @@ class OrdenCompraResource extends Resource
                     ->schema([
                         Forms\Components\Repeater::make('detalles')
                             ->schema([
-                                Grid::make(12)
+                                Grid::make(14)
                                     ->schema([
                                         Forms\Components\Select::make('id_bodega')
                                             ->label('Bodega')
+                                            ->placeholder('Seleccione')
                                             ->options(function (Get $get) {
                                                 $empresaId = $get('../../id_empresa');
                                                 $amdgIdEmpresaCode = $get('../../amdg_id_empresa');
                                                 $amdg_id_sucursal = $get('../../amdg_id_sucursal');
-                                                if (!$empresaId || !$amdgIdEmpresaCode) return [];
+                                                if (!$empresaId || !$amdgIdEmpresaCode)
+                                                    return [];
                                                 $connectionName = self::getExternalConnectionName($empresaId);
-                                                if (!$connectionName) return [];
+                                                if (!$connectionName)
+                                                    return [];
                                                 try {
                                                     return DB::connection($connectionName)->table('saebode')
                                                         ->join('saesubo', 'subo_cod_bode', '=', 'bode_cod_bode')
@@ -326,7 +329,6 @@ class OrdenCompraResource extends Resource
                                                         ->select(['prod_cod_prod', DB::raw("prod_nom_prod || ' (' || prod_cod_prod || ')' AS productos_etiqueta")])
                                                         ->orderBy('productos_etiqueta', 'asc')
                                                         ->pluck('productos_etiqueta', 'prod_cod_prod');
-
                                                 } catch (\Exception $e) {
                                                     return [];
                                                 }
@@ -364,11 +366,11 @@ class OrdenCompraResource extends Resource
                                             }),
                                         Forms\Components\Hidden::make('producto'),
                                         Forms\Components\TextInput::make('cantidad')->numeric()->required()->live()->default(1)->columnSpan(['default' => 12, 'lg' => 1]),
-                                        Forms\Components\TextInput::make('costo')->numeric()->required()->live()->prefix('$')->columnSpan(['default' => 12, 'lg' => 1]),
-                                        Forms\Components\TextInput::make('descuento')->numeric()->required()->live()->default(0)->prefix('$')->columnSpan(['default' => 12, 'lg' => 1]),
+                                        Forms\Components\TextInput::make('costo')->numeric()->required()->live()->prefix('$')->columnSpan(['default' => 12, 'lg' => 2]),
+                                        Forms\Components\TextInput::make('descuento')->numeric()->required()->live()->default(0)->prefix('$')->columnSpan(['default' => 12, 'lg' => 2]),
                                         Forms\Components\Select::make('impuesto')->options(['0' => '0%', '5' => '5%', '15' => '15%', '18' => '18%'])->required()->live()->columnSpan(['default' => 12, 'lg' => 1]),
                                         Forms\Components\Placeholder::make('valor_iva')
-                                            ->label('Valor IVA')
+                                            ->label('IVA')
                                             ->content(function (Get $get) {
                                                 $cantidad = floatval($get('cantidad'));
                                                 $costo = floatval($get('costo'));
@@ -735,7 +737,6 @@ class OrdenCompraResource extends Resource
                                 ->first();
 
                             return $empresa->nombre_empresa ?? 'Empresa no encontrado';
-
                         } catch (\Exception $e) {
                             // Manejar errores de conexión o consulta
                             return 'Error DB';
@@ -773,7 +774,6 @@ class OrdenCompraResource extends Resource
                                 ->first();
 
                             return $sucursal->nombre_sucursal ?? 'Sucursal no encontrado';
-
                         } catch (\Exception $e) {
                             // Manejar errores de conexión o consulta
                             return 'Error DB';
