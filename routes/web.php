@@ -5,7 +5,7 @@ use App\Http\Controllers\OrdenCompraController;
 use App\Http\Controllers\ResumenPedidosController;
 
 Route::get('/', function () {
-    return view('welcome');
+    return view('landing');
 });
 
 Route::get('/orden-compra/{ordenCompra}/pdf', [OrdenCompraController::class, 'descargarPdf'])->name('orden-compra.pdf');
