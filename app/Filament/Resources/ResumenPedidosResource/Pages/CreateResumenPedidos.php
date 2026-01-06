@@ -1,0 +1,53 @@
+<?php
+
+namespace App\Filament\Resources\ResumenPedidosResource\Pages;
+
+use App\Filament\Resources\ResumenPedidosResource;
+use App\Models\DetalleResumenPedidos;
+use Filament\Resources\Pages\CreateRecord;
+use Illuminate\Support\Facades\DB;
+use App\Models\ResumenPedidos;
+
+class CreateResumenPedidos extends CreateRecord
+{
+    protected static string $resource = ResumenPedidosResource::class;
+
+    protected function getRedirectUrl(): string
+    {
+        return $this->getResource()::getUrl('index');
+    }
+
+    protected function mutateFormDataBeforeCreate(array $data): array
+    {
+        // Calculate the next sequential number
+        $nextSecuencial = (ResumenPedidos::max('codigo_secuencial') ?? 0) + 1;
+        $data['codigo_secuencial'] = $nextSecuencial;
+
+        // You might want to add other default fields here if necessary
+        // For example, if 'tipo' or 'descripcion' are based on other fields
+        $data['tipo'] = $data['tipo_presupuesto']; // Assuming this is the case from the form
+        $data['descripcion'] = 'Resumen generado el ' . now()->toDateTimeString();
+
+
+        return $data;
+    }
+
+    protected function afterCreate(): void
+    {
+        // Get the created record
+        $resumenPedido = $this->getRecord();
+
+        // Get the purchase orders from the form data
+        $ordenesCompra = $this->data['ordenes_compra'] ?? [];
+
+        // Filter for selected orders and create detail records
+        foreach ($ordenesCompra as $orden) {
+            if (!empty($orden['checkbox_oc'])) {
+                DetalleResumenPedidos::create([
+                    'id_resumen_pedidos' => $resumenPedido->id,
+                    'id_orden_compra' => $orden['id_orden_compra'],
+                ]);
+            }
+        }
+    }
+}
