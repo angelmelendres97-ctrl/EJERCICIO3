@@ -54,9 +54,9 @@ class ProveedorResource extends Resource
         return $connectionName;
     }
 
-    public static function form(Form $form): Form
+    public static function getFormSchema(): array
     {
-        return $form->schema([
+        return [
             Forms\Components\Section::make('Información General')
                 ->schema([
                     Forms\Components\Select::make('id_empresa')
@@ -553,7 +553,12 @@ class ProveedorResource extends Resource
                         })
                         ->columns(2)
                 ])->columns(1),
-        ]);
+        ];
+    }
+
+    public static function form(Form $form): Form
+    {
+        return $form->schema(self::getFormSchema());
     }
 
     public static function table(Table $table): Table

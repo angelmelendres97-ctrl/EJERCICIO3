@@ -68,10 +68,9 @@ class ProductoResource extends Resource
         return $connectionName;
     }
 
-    public static function form(Form $form): Form
+    public static function getFormSchema(): array
     {
-        return $form
-            ->schema([
+        return [
                 Forms\Components\Section::make('Conexion e informacion principal')
                     ->schema([
                         Forms\Components\Select::make('id_empresa')
@@ -530,7 +529,12 @@ class ProductoResource extends Resource
                             })
                             ->columns(2)
                     ])->columns(1),
-            ]);
+        ];
+    }
+
+    public static function form(Form $form): Form
+    {
+        return $form->schema(self::getFormSchema());
     }
 
     public static function table(Table $table): Table
