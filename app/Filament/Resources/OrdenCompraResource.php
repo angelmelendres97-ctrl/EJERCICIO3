@@ -15,6 +15,11 @@ use Illuminate\Support\Facades\DB;
 use Filament\Forms\Get;
 use Filament\Forms\Set;
 use App\Filament\Resources\ProveedorResource;
+use App\Filament\Resources\ProductoResource;
+use App\Models\Proveedores;
+use App\Models\Producto;
+use App\Services\ProveedorSyncService;
+use App\Services\ProductoSyncService;
 
 use Filament\Forms\Components\Placeholder;
 use Filament\Forms\Components\Section;
@@ -25,6 +30,7 @@ use Filament\Forms\Components\Actions;
 use Filament\Forms\Components\View;
 use Filament\Actions\StaticAction;
 use Illuminate\Database\Eloquent\Model; // ESTA LÍNEA ES NECESARIA
+use Filament\Notifications\Notification;
 
 class OrdenCompraResource extends Resource
 {
@@ -66,70 +72,103 @@ class OrdenCompraResource extends Resource
     {
         return $form
             ->schema([
-                Actions::make([
-                    Action::make('verProductos')
-                        ->label('Ver Productos de la Orden')
-                        ->action(function (OrdenCompra $record) {
-                            // No action needed here, it just opens the modal
-                        })
-                        ->modalContent(fn(OrdenCompra $record): \Illuminate\Contracts\View\View => view(
-                            'filament.resources.orden-compra-resource.actions.ver-productos',
-                            ['detalles' => $record->detalles],
-                        ))
-                        ->modalSubmitAction(false)
-                        ->modalCancelAction(fn(StaticAction $action) => $action->label('Cerrar'))
-                        ->color('info')
-                        ->icon('heroicon-o-eye'),
-                ])
-                    ->columnSpanFull()
-                    ->visible(fn($record) => $record !== null),
+
+                /*
+                |--------------------------------------------------------------------------
+                | MODAL "Ver Productos de la Orden" (DESACTIVADO TEMPORALMENTE)
+                | Motivo: en tu entorno está fallando por métodos no disponibles.
+                |--------------------------------------------------------------------------
+                */
+                // Actions::make([
+                //     Action::make('verProductos')
+                //         ->label('Ver Productos de la Orden')
+                //         ->action(function (OrdenCompra $record) {
+                //             // No action needed here, it just opens the modal
+                //         })
+                //         ->modalContent(fn(OrdenCompra $record): \Illuminate\Contracts\View\View => view(
+                //             'filament.resources.orden-compra-resource.actions.ver-productos',
+                //             ['detalles' => $record->detalles],
+                //         ))
+                //         ->modalSubmitAction(false)
+                //         ->modalCancelAction(fn(StaticAction $action) => $action->label('Cerrar'))
+                //         ->color('info')
+                //         ->icon('heroicon-o-eye'),
+                // ])
+                //     ->columnSpanFull()
+                //     ->visible(fn($record) => $record !== null),
+
                 Forms\Components\Section::make('Conexión y Empresa')
                     ->schema([
                         Forms\Components\Select::make('id_empresa')
-                            ->label('Conexion')
+                            ->label('Conexión')
                             ->relationship('empresa', 'nombre_empresa')
                             ->searchable()
                             ->preload()
                             ->live()
                             ->required(),
+
                         Forms\Components\Select::make('amdg_id_empresa')
                             ->label('Empresa')
                             ->options(function (Get $get) {
                                 $empresaId = $get('id_empresa');
-                                if (!$empresaId)
+                                if (!$empresaId) {
                                     return [];
+                                }
+
                                 $connectionName = self::getExternalConnectionName($empresaId);
-                                if (!$connectionName)
+                                if (!$connectionName) {
                                     return [];
+                                }
+
                                 try {
-                                    return DB::connection($connectionName)->table('saeempr')->pluck('empr_nom_empr', 'empr_cod_empr')->all();
+                                    return DB::connection($connectionName)
+                                        ->table('saeempr')
+                                        ->pluck('empr_nom_empr', 'empr_cod_empr')
+                                        ->all();
                                 } catch (\Exception $e) {
                                     return [];
                                 }
                             })
-                            ->searchable()->live()->required(),
+                            ->searchable()
+                            ->live()
+                            ->required(),
+
                         Forms\Components\Select::make('amdg_id_sucursal')
                             ->label('Sucursal')
                             ->options(function (Get $get) {
                                 $empresaId = $get('id_empresa');
                                 $amdgIdEmpresaCode = $get('amdg_id_empresa');
-                                if (!$empresaId || !$amdgIdEmpresaCode)
+
+                                if (!$empresaId || !$amdgIdEmpresaCode) {
                                     return [];
+                                }
+
                                 $connectionName = self::getExternalConnectionName($empresaId);
-                                if (!$connectionName)
+                                if (!$connectionName) {
                                     return [];
+                                }
+
                                 try {
-                                    return DB::connection($connectionName)->table('saesucu')->where('sucu_cod_empr', $amdgIdEmpresaCode)->pluck('sucu_nom_sucu', 'sucu_cod_sucu')->all();
+                                    return DB::connection($connectionName)
+                                        ->table('saesucu')
+                                        ->where('sucu_cod_empr', $amdgIdEmpresaCode)
+                                        ->pluck('sucu_nom_sucu', 'sucu_cod_sucu')
+                                        ->all();
                                 } catch (\Exception $e) {
                                     return [];
                                 }
                             })
-                            ->searchable()->live()->required(),
+                            ->searchable()
+                            ->live()
+                            ->required(),
                     ])->columns(3),
 
-
+                /*
+                |--------------------------------------------------------------------------
+                | ESTE MODAL SÍ SE REACTIVA (Importar desde Pedido)
+                |--------------------------------------------------------------------------
+                */
                 Forms\Components\Section::make('Información Presupuesto')
-
                     ->headerActions([
                         Action::make('importar_pedido')
                             ->label('Importar desde Pedido')
@@ -138,14 +177,20 @@ class OrdenCompraResource extends Resource
                                 $id_empresa = $get('id_empresa');
                                 $amdg_id_empresa = $get('amdg_id_empresa');
                                 $amdg_id_sucursal = $get('amdg_id_sucursal');
-                                return view('livewire.buscar-pedidos-compra-container', compact('id_empresa', 'amdg_id_empresa', 'amdg_id_sucursal'));
+                                $pedidos_importados = $get('pedidos_importados');
+
+                                return view('livewire.buscar-pedidos-compra-container', compact(
+                                    'id_empresa',
+                                    'amdg_id_empresa',
+                                    'amdg_id_sucursal',
+                                    'pedidos_importados'
+                                ));
                             })
                             ->modalHeading('Buscar Pedidos de Compra para Importar')
                             ->modalSubmitAction(false)
-                            ->modalCancelAction(false)
+                            ->modalCancelAction(fn(StaticAction $action) => $action->label('Cerrar'))
                             ->visible(fn(Get $get) => !empty($get('id_empresa')) && !empty($get('amdg_id_empresa')) && !empty($get('amdg_id_sucursal')))
                     ])
-
                     ->schema([
 
                         Forms\Components\TextInput::make('pedidos_importados')
@@ -179,7 +224,13 @@ class OrdenCompraResource extends Resource
 
                         Forms\Components\Select::make(name: 'tipo_oc')
                             ->label('Tipo Orden Compra:')
-                            ->options(['REEMB' => 'REEMBOLSO', 'COMPRA' => 'COMPRA', 'PAGO' => 'PAGO', 'REGUL' => 'REGULARIZACION', 'CAJAC' => 'CAJA CHICA'])
+                            ->options([
+                                'REEMB' => 'REEMBOLSO',
+                                'COMPRA' => 'COMPRA',
+                                'PAGO' => 'PAGO',
+                                'REGUL' => 'REGULARIZACIÓN',
+                                'CAJAC' => 'CAJA CHICA'
+                            ])
                             ->required(),
 
                         Forms\Components\TextInput::make('nombre_reembolso')
@@ -196,35 +247,67 @@ class OrdenCompraResource extends Resource
 
                 Forms\Components\Section::make('Información General')
                     ->schema([
-                        Forms\Components\TextInput::make('id_proveedor')->numeric()->required()->label('ID Proveedor')->readOnly()->columnSpan(1),
-                        Forms\Components\TextInput::make('identificacion')->maxLength(20)->label('Identificación (RUC/DNI)')->readOnly()->columnSpan(1),
+                        Forms\Components\TextInput::make('id_proveedor')
+                            ->numeric()
+                            ->required()
+                            ->label('ID Proveedor')
+                            ->readOnly()
+                            ->columnSpan(1),
+
+                        Forms\Components\TextInput::make('identificacion')
+                            ->maxLength(20)
+                            ->label('Identificación (RUC/DNI)')
+                            ->readOnly()
+                            ->columnSpan(1),
+
                         Forms\Components\Hidden::make('proveedor'),
+
                         Forms\Components\Select::make('info_proveedor')
                             ->label('Proveedor')
                             ->options(function (Get $get) {
                                 $empresaId = $get('id_empresa');
                                 $amdg_id_empresa = $get('amdg_id_empresa');
-                                if (!$empresaId)
+
+                                if (!$empresaId) {
                                     return [];
+                                }
+
                                 $connectionName = self::getExternalConnectionName($empresaId);
-                                if (!$connectionName)
+                                if (!$connectionName) {
                                     return [];
+                                }
+
                                 try {
-                                    return DB::connection($connectionName)->table('saeclpv')->where('clpv_cod_empr', $amdg_id_empresa)
+                                    return DB::connection($connectionName)
+                                        ->table('saeclpv')
+                                        ->where('clpv_cod_empr', $amdg_id_empresa)
                                         ->where('clpv_clopv_clpv', 'PV')
-                                        ->select(['clpv_cod_clpv', DB::raw("clpv_nom_clpv || ' (' || clpv_ruc_clpv || ')' AS proveedor_etiqueta")])
-                                        ->pluck('proveedor_etiqueta', 'clpv_cod_clpv')->all();
+                                        ->select([
+                                            'clpv_cod_clpv',
+                                            DB::raw("clpv_nom_clpv || ' (' || clpv_ruc_clpv || ')' AS proveedor_etiqueta")
+                                        ])
+                                        ->pluck('proveedor_etiqueta', 'clpv_cod_clpv')
+                                        ->all();
                                 } catch (\Exception $e) {
                                     return [];
                                 }
                             })
-                            ->searchable()->live()->required()->columnSpan(2)
+                            ->searchable()
+                            ->live()
+                            ->required()
+                            ->columnSpan(2)
                             ->suffixAction(
-                                Action::make('crear_proveedor')
+                                /*
+                                |--------------------------------------------------------------------------
+                                | Antes: modal para crear proveedor (DESACTIVADO).
+                                | Ahora: link directo a /admin/proveedors/create
+                                |--------------------------------------------------------------------------
+                                */
+                                Action::make('ir_crear_proveedor')
                                     ->label('+')
                                     ->tooltip('Crear proveedor')
                                     ->icon('heroicon-o-plus')
-                                    ->url(fn() => ProveedorResource::getUrl('create'))
+                                    ->url(fn() => url('/admin/proveedors/create'))
                                     ->openUrlInNewTab()
                             )
                             ->afterStateUpdated(function (Set $set, Get $get, ?string $state) {
@@ -232,14 +315,23 @@ class OrdenCompraResource extends Resource
                                     $set('identificacion', null);
                                     return;
                                 }
+
                                 $empresaId = $get('id_empresa');
                                 $amdg_id_empresa = $get('amdg_id_empresa');
+
                                 $connectionName = self::getExternalConnectionName($empresaId);
                                 if (!$connectionName) {
                                     $set('identificacion', null);
                                     return;
                                 }
-                                $data = DB::connection($connectionName)->table('saeclpv')->where('clpv_cod_clpv', $state)->where('clpv_cod_empr', $amdg_id_empresa)->select('clpv_ruc_clpv', 'clpv_cod_clpv', 'clpv_nom_clpv')->first();
+
+                                $data = DB::connection($connectionName)
+                                    ->table('saeclpv')
+                                    ->where('clpv_cod_clpv', $state)
+                                    ->where('clpv_cod_empr', $amdg_id_empresa)
+                                    ->select('clpv_ruc_clpv', 'clpv_cod_clpv', 'clpv_nom_clpv')
+                                    ->first();
+
                                 if ($data) {
                                     $set('identificacion', $data->clpv_ruc_clpv);
                                     $set('id_proveedor', $data->clpv_cod_clpv);
@@ -250,36 +342,81 @@ class OrdenCompraResource extends Resource
                                     $set('proveedor', null);
                                 }
                             }),
+
                         Forms\Components\Select::make('trasanccion')
-                            ->label('Transaccion')
+                            ->label('Transacción')
                             ->options(function (Get $get) {
                                 $empresaId = $get('id_empresa');
                                 $amdg_id_empresa = $get('amdg_id_empresa');
                                 $amdg_id_sucursal = $get('amdg_id_sucursal');
-                                if (!$empresaId)
+
+                                if (!$empresaId) {
                                     return [];
+                                }
+
                                 $connectionName = self::getExternalConnectionName($empresaId);
-                                if (!$connectionName)
+                                if (!$connectionName) {
                                     return [];
+                                }
+
                                 try {
-                                    return DB::connection($connectionName)->table('saetran as t')
+                                    return DB::connection($connectionName)
+                                        ->table('saetran as t')
                                         ->join('saedefi as d', 't.tran_cod_tran', '=', 'd.defi_cod_tran')
-                                        ->where('t.tran_cod_empr', $amdg_id_empresa)->where('t.tran_cod_sucu', $amdg_id_sucursal)->where('t.tran_cod_modu', 10)
-                                        ->where('d.defi_cod_empr', $amdg_id_empresa)->where('d.defi_tip_defi', '4')->where('d.defi_cod_modu', 10)
-                                        ->select(['t.tran_des_tran', DB::raw("t.tran_des_tran || ' (' || t.tran_cod_tran || ')' AS transaccion_etiqueta")])
-                                        ->groupBy('t.tran_des_tran', 'transaccion_etiqueta')->orderBy('transaccion_etiqueta', 'asc')->pluck('transaccion_etiqueta', 't.tran_des_tran')->all();
+                                        ->where('t.tran_cod_empr', $amdg_id_empresa)
+                                        ->where('t.tran_cod_sucu', $amdg_id_sucursal)
+                                        ->where('t.tran_cod_modu', 10)
+                                        ->where('d.defi_cod_empr', $amdg_id_empresa)
+                                        ->where('d.defi_tip_defi', '4')
+                                        ->where('d.defi_cod_modu', 10)
+                                        ->select([
+                                            't.tran_des_tran',
+                                            DB::raw("t.tran_des_tran || ' (' || t.tran_cod_tran || ')' AS transaccion_etiqueta")
+                                        ])
+                                        ->groupBy('t.tran_des_tran', 'transaccion_etiqueta')
+                                        ->orderBy('transaccion_etiqueta', 'asc')
+                                        ->pluck('transaccion_etiqueta', 't.tran_des_tran')
+                                        ->all();
                                 } catch (\Exception $e) {
                                     return [];
                                 }
                             })
-                            ->searchable()->live()->default('ORDEN DE COMPRA')->required()->columnSpan(2),
-                        Forms\Components\DatePicker::make('fecha_pedido')->label('Fecha del Pedido')->default(now())->required(),
-                        Forms\Components\DatePicker::make('fecha_entrega')->label('Fecha de Entrega Estimada')->default(now()->addWeek())->required(),
-                        Forms\Components\Textarea::make('observaciones')->label('Observaciones')->maxLength(65535)->columnSpanFull(),
+                            ->searchable()
+                            ->live()
+                            ->default('ORDEN DE COMPRA')
+                            ->required()
+                            ->columnSpan(2),
+
+                        Forms\Components\DatePicker::make('fecha_pedido')
+                            ->label('Fecha del Pedido')
+                            ->default(now())
+                            ->required(),
+
+                        Forms\Components\DatePicker::make('fecha_entrega')
+                            ->label('Fecha de Entrega Estimada')
+                            ->default(now()->addWeek())
+                            ->required(),
+
+                        Forms\Components\Textarea::make('observaciones')
+                            ->label('Observaciones')
+                            ->maxLength(65535)
+                            ->columnSpanFull(),
                     ])->columns(4),
 
                 Forms\Components\Section::make('Productos')
-
+                    ->headerActions([
+                        /*
+                        |--------------------------------------------------------------------------
+                        | Antes: modal para registrar producto (DESACTIVADO).
+                        | Ahora: link directo a /admin/products/create
+                        |--------------------------------------------------------------------------
+                        */
+                        Action::make('ir_crear_producto')
+                            ->label('+ Registrar nuevo producto')
+                            ->icon('heroicon-o-plus')
+                            ->url(fn() => url('/admin/productos/create'))
+                            ->openUrlInNewTab(),
+                    ])
                     ->schema([
                         Forms\Components\Repeater::make('detalles')
                             ->schema([
@@ -292,48 +429,74 @@ class OrdenCompraResource extends Resource
                                                 $empresaId = $get('../../id_empresa');
                                                 $amdgIdEmpresaCode = $get('../../amdg_id_empresa');
                                                 $amdg_id_sucursal = $get('../../amdg_id_sucursal');
-                                                if (!$empresaId || !$amdgIdEmpresaCode)
+
+                                                if (!$empresaId || !$amdgIdEmpresaCode) {
                                                     return [];
+                                                }
+
                                                 $connectionName = self::getExternalConnectionName($empresaId);
-                                                if (!$connectionName)
+                                                if (!$connectionName) {
                                                     return [];
+                                                }
+
                                                 try {
-                                                    return DB::connection($connectionName)->table('saebode')
+                                                    return DB::connection($connectionName)
+                                                        ->table('saebode')
                                                         ->join('saesubo', 'subo_cod_bode', '=', 'bode_cod_bode')
                                                         ->where('subo_cod_empr', $amdgIdEmpresaCode)
                                                         ->where('bode_cod_empr', $amdgIdEmpresaCode)
                                                         ->where('subo_cod_sucu', $amdg_id_sucursal)
-                                                        ->pluck('bode_nom_bode', 'bode_cod_bode')->all();
+                                                        ->pluck('bode_nom_bode', 'bode_cod_bode')
+                                                        ->all();
                                                 } catch (\Exception $e) {
                                                     return [];
                                                 }
                                             })
-                                            ->searchable()->live()->required()->columnSpan(['default' => 12, 'lg' => 2]),
+                                            ->searchable()
+                                            ->live()
+                                            ->required()
+                                            ->columnSpan(['default' => 12, 'lg' => 2]),
+
                                         Forms\Components\Select::make('codigo_producto')
                                             ->label('Producto')
                                             ->options(function (Get $get) {
                                                 $empresaId = $get('../../id_empresa');
                                                 $amdg_id_empresa = $get('../../amdg_id_empresa');
                                                 $amdg_id_sucursal = $get('../../amdg_id_sucursal');
-                                                $id_bodega = $get('id_bodega'); // Updated path
-                                                if (!$empresaId || !$id_bodega)
+                                                $id_bodega = $get('id_bodega');
+
+                                                if (!$empresaId || !$id_bodega) {
                                                     return [];
+                                                }
+
                                                 $connectionName = self::getExternalConnectionName($empresaId);
-                                                if (!$connectionName)
+                                                if (!$connectionName) {
                                                     return [];
+                                                }
+
                                                 try {
-                                                    return DB::connection($connectionName)->table('saeprod')
+                                                    return DB::connection($connectionName)
+                                                        ->table('saeprod')
                                                         ->join('saeprbo', 'prbo_cod_prod', '=', 'prod_cod_prod')
-                                                        ->where('prod_cod_sucu', $amdg_id_sucursal)->where('prod_cod_empr', $amdg_id_empresa)
-                                                        ->where('prbo_cod_empr', $amdg_id_empresa)->where('prbo_cod_sucu', $amdg_id_sucursal)->where('prbo_cod_bode', $id_bodega)
-                                                        ->select(['prod_cod_prod', DB::raw("prod_nom_prod || ' (' || prod_cod_prod || ')' AS productos_etiqueta")])
+                                                        ->where('prod_cod_sucu', $amdg_id_sucursal)
+                                                        ->where('prod_cod_empr', $amdg_id_empresa)
+                                                        ->where('prbo_cod_empr', $amdg_id_empresa)
+                                                        ->where('prbo_cod_sucu', $amdg_id_sucursal)
+                                                        ->where('prbo_cod_bode', $id_bodega)
+                                                        ->select([
+                                                            'prod_cod_prod',
+                                                            DB::raw("prod_nom_prod || ' (' || prod_cod_prod || ')' AS productos_etiqueta")
+                                                        ])
                                                         ->orderBy('productos_etiqueta', 'asc')
                                                         ->pluck('productos_etiqueta', 'prod_cod_prod');
                                                 } catch (\Exception $e) {
                                                     return [];
                                                 }
                                             })
-                                            ->searchable()->live()->required()->columnSpan(['default' => 12, 'lg' => 3])
+                                            ->searchable()
+                                            ->live()
+                                            ->required()
+                                            ->columnSpan(['default' => 12, 'lg' => 3])
                                             ->afterStateUpdated(function (Set $set, Get $get, ?string $state) {
                                                 if (empty($state)) {
                                                     $set('producto', null);
@@ -345,17 +508,25 @@ class OrdenCompraResource extends Resource
                                                 $empresaId = $get('../../id_empresa');
                                                 $amdg_id_empresa = $get('../../amdg_id_empresa');
                                                 $amdg_id_sucursal = $get('../../amdg_id_sucursal');
-                                                $id_bodega = $get('id_bodega'); // Updated path
-                                                $connectionName = self::getExternalConnectionName($empresaId);
-                                                if (!$connectionName)
-                                                    return;
+                                                $id_bodega = $get('id_bodega');
 
-                                                $data = DB::connection($connectionName)->table('saeprod')
+                                                $connectionName = self::getExternalConnectionName($empresaId);
+                                                if (!$connectionName) {
+                                                    return;
+                                                }
+
+                                                $data = DB::connection($connectionName)
+                                                    ->table('saeprod')
                                                     ->join('saeprbo', 'prbo_cod_prod', '=', 'prod_cod_prod')
-                                                    ->where('prod_cod_sucu', $amdg_id_sucursal)->where('prod_cod_empr', $amdg_id_empresa)
-                                                    ->where('prbo_cod_empr', $amdg_id_empresa)->where('prbo_cod_sucu', $amdg_id_sucursal)
-                                                    ->where('prbo_cod_bode', $id_bodega)->where('prbo_cod_prod', $state)->where('prod_cod_prod', $state)
-                                                    ->select('prbo_uco_prod', 'prbo_iva_porc', 'prod_nom_prod')->first();
+                                                    ->where('prod_cod_sucu', $amdg_id_sucursal)
+                                                    ->where('prod_cod_empr', $amdg_id_empresa)
+                                                    ->where('prbo_cod_empr', $amdg_id_empresa)
+                                                    ->where('prbo_cod_sucu', $amdg_id_sucursal)
+                                                    ->where('prbo_cod_bode', $id_bodega)
+                                                    ->where('prbo_cod_prod', $state)
+                                                    ->where('prod_cod_prod', $state)
+                                                    ->select('prbo_uco_prod', 'prbo_iva_porc', 'prod_nom_prod')
+                                                    ->first();
 
                                                 if ($data) {
                                                     $set('costo', number_format($data->prbo_uco_prod, 6, '.', ''));
@@ -364,11 +535,37 @@ class OrdenCompraResource extends Resource
                                                     $set('producto', $data->prod_nom_prod . ' (' . $state . ')');
                                                 }
                                             }),
+
                                         Forms\Components\Hidden::make('producto'),
-                                        Forms\Components\TextInput::make('cantidad')->numeric()->required()->live()->default(1)->columnSpan(['default' => 12, 'lg' => 1]),
-                                        Forms\Components\TextInput::make('costo')->numeric()->required()->live()->prefix('$')->columnSpan(['default' => 12, 'lg' => 2]),
-                                        Forms\Components\TextInput::make('descuento')->numeric()->required()->live()->default(0)->prefix('$')->columnSpan(['default' => 12, 'lg' => 2]),
-                                        Forms\Components\Select::make('impuesto')->options(['0' => '0%', '5' => '5%', '15' => '15%', '18' => '18%'])->required()->live()->columnSpan(['default' => 12, 'lg' => 1]),
+
+                                        Forms\Components\TextInput::make('cantidad')
+                                            ->numeric()
+                                            ->required()
+                                            ->live()
+                                            ->default(1)
+                                            ->columnSpan(['default' => 12, 'lg' => 1]),
+
+                                        Forms\Components\TextInput::make('costo')
+                                            ->numeric()
+                                            ->required()
+                                            ->live()
+                                            ->prefix('$')
+                                            ->columnSpan(['default' => 12, 'lg' => 2]),
+
+                                        Forms\Components\TextInput::make('descuento')
+                                            ->numeric()
+                                            ->required()
+                                            ->live()
+                                            ->default(0)
+                                            ->prefix('$')
+                                            ->columnSpan(['default' => 12, 'lg' => 2]),
+
+                                        Forms\Components\Select::make('impuesto')
+                                            ->options(['0' => '0%', '5' => '5%', '15' => '15%', '18' => '18%'])
+                                            ->required()
+                                            ->live()
+                                            ->columnSpan(['default' => 12, 'lg' => 1]),
+
                                         Forms\Components\Placeholder::make('valor_iva')
                                             ->label('IVA')
                                             ->content(function (Get $get) {
@@ -377,7 +574,9 @@ class OrdenCompraResource extends Resource
                                                 $iva = floatval($get('impuesto'));
                                                 $valorIva = ($cantidad * $costo) * ($iva / 100);
                                                 return '$' . number_format($valorIva, 4, '.', '');
-                                            })->columnSpan(['default' => 12, 'lg' => 1]),
+                                            })
+                                            ->columnSpan(['default' => 12, 'lg' => 1]),
+
                                         Forms\Components\Placeholder::make('total_linea')
                                             ->label('Total Item')
                                             ->content(function (Get $get) {
@@ -385,18 +584,20 @@ class OrdenCompraResource extends Resource
                                                 $costo = floatval($get('costo'));
                                                 $descuento = floatval($get('descuento'));
                                                 $iva = floatval($get('impuesto'));
+
                                                 $subtotal = $cantidad * $costo;
                                                 $valorIva = $subtotal * ($iva / 100);
                                                 $total = ($subtotal + $valorIva) - $descuento;
+
                                                 return '$' . number_format($total, 4, '.', '');
-                                            })->columnSpan(['default' => 12, 'lg' => 2]),
+                                            })
+                                            ->columnSpan(['default' => 12, 'lg' => 2]),
                                     ]),
                             ])
                             ->relationship()
                             ->columns(1)
                             ->addActionLabel('Agregar Producto')
                             ->afterStateUpdated(function (Get $get, Set $set) {
-                                // Recalculate and set totals in hidden fields
                                 $detalles = $get('detalles');
                                 $subtotalGeneral = 0;
                                 $descuentoGeneral = 0;
@@ -407,12 +608,15 @@ class OrdenCompraResource extends Resource
                                     $costo = floatval($detalle['costo'] ?? 0);
                                     $descuento = floatval($detalle['descuento'] ?? 0);
                                     $porcentajeIva = floatval($detalle['impuesto'] ?? 0);
+
                                     $subtotalItem = $cantidad * $costo;
                                     $valorIva = $subtotalItem * ($porcentajeIva / 100);
+
                                     $subtotalGeneral += $subtotalItem;
                                     $descuentoGeneral += $descuento;
                                     $impuestoGeneral += $valorIva;
                                 }
+
                                 $totalGeneral = ($subtotalGeneral - $descuentoGeneral) + $impuestoGeneral;
 
                                 $set('subtotal', number_format($subtotalGeneral, 2, '.', ''));
@@ -421,7 +625,6 @@ class OrdenCompraResource extends Resource
                                 $set('total', number_format($totalGeneral, 2, '.', ''));
                             })
                             ->live(),
-
                     ]),
 
                 // Hidden fields for totals
@@ -469,12 +672,6 @@ class OrdenCompraResource extends Resource
                                     ]),
 
                                 Grid::make()->columns(2)->extraAttributes(['class' => 'flex justify-end gap-4'])
-                                    ->hidden(function (Get $get) {
-                                        $baseIva0 = collect($get('detalles'))->where('impuesto', '0')->reduce(function ($carry, $item) {
-                                            return $carry + (floatval($item['cantidad']) * floatval($item['costo']));
-                                        }, 0);
-                                        return $baseIva0 <= 0;
-                                    })
                                     ->schema([
                                         Placeholder::make('lbl_base_iva0')
                                             ->content('Subtotal IVA 0%')
@@ -492,30 +689,20 @@ class OrdenCompraResource extends Resource
                                     ]),
 
                                 Grid::make()->columns(2)->extraAttributes(['class' => 'flex justify-end gap-4'])
-                                    ->hidden(function (Get $get) {
-                                        $baseIva0 = collect($get('detalles'))->where('impuesto', '0')->reduce(function ($carry, $item) {
-                                            return $carry + (floatval($item['cantidad']) * floatval($item['costo']));
-                                        }, 0);
-                                        return $baseIva0 <= 0;
-                                    })
                                     ->schema([
                                         Placeholder::make('lbl_iva0')
                                             ->content('IVA 0%')
                                             ->extraAttributes(['class' => 'text-right font-semibold'])
                                             ->hiddenLabel(),
                                         Placeholder::make('val_iva0')
-                                            ->content('$0.00')
+                                            ->content(function () {
+                                                return '$' . number_format(0, 2, '.', '');
+                                            })
                                             ->extraAttributes(['class' => 'text-right font-bold w-32'])
                                             ->hiddenLabel(),
                                     ]),
 
                                 Grid::make()->columns(2)->extraAttributes(['class' => 'flex justify-end gap-4'])
-                                    ->hidden(function (Get $get) {
-                                        $baseIva5 = collect($get('detalles'))->where('impuesto', '5')->reduce(function ($carry, $item) {
-                                            return $carry + (floatval($item['cantidad']) * floatval($item['costo']));
-                                        }, 0);
-                                        return $baseIva5 <= 0;
-                                    })
                                     ->schema([
                                         Placeholder::make('lbl_base_iva5')
                                             ->content('Subtotal IVA 5%')
@@ -533,12 +720,6 @@ class OrdenCompraResource extends Resource
                                     ]),
 
                                 Grid::make()->columns(2)->extraAttributes(['class' => 'flex justify-end gap-4'])
-                                    ->hidden(function (Get $get) {
-                                        $totalIva = collect($get('detalles'))->where('impuesto', '5')->reduce(function ($carry, $item) {
-                                            return $carry + (floatval($item['cantidad']) * floatval($item['costo']) * 0.05);
-                                        }, 0);
-                                        return $totalIva <= 0;
-                                    })
                                     ->schema([
                                         Placeholder::make('lbl_iva5')
                                             ->content('IVA 5%')
@@ -556,12 +737,6 @@ class OrdenCompraResource extends Resource
                                     ]),
 
                                 Grid::make()->columns(2)->extraAttributes(['class' => 'flex justify-end gap-4'])
-                                    ->hidden(function (Get $get) {
-                                        $baseIva15 = collect($get('detalles'))->where('impuesto', '15')->reduce(function ($carry, $item) {
-                                            return $carry + (floatval($item['cantidad']) * floatval($item['costo']));
-                                        }, 0);
-                                        return $baseIva15 <= 0;
-                                    })
                                     ->schema([
                                         Placeholder::make('lbl_base_iva15')
                                             ->content('Subtotal IVA 15%')
@@ -579,12 +754,6 @@ class OrdenCompraResource extends Resource
                                     ]),
 
                                 Grid::make()->columns(2)->extraAttributes(['class' => 'flex justify-end gap-4'])
-                                    ->hidden(function (Get $get) {
-                                        $totalIva15 = collect($get('detalles'))->where('impuesto', '15')->reduce(function ($carry, $item) {
-                                            return $carry + (floatval($item['cantidad']) * floatval($item['costo']) * 0.15);
-                                        }, 0);
-                                        return $totalIva15 <= 0;
-                                    })
                                     ->schema([
                                         Placeholder::make('lbl_iva15')
                                             ->content('IVA 15%')
@@ -602,12 +771,6 @@ class OrdenCompraResource extends Resource
                                     ]),
 
                                 Grid::make()->columns(2)->extraAttributes(['class' => 'flex justify-end gap-4'])
-                                    ->hidden(function (Get $get) {
-                                        $baseIva18 = collect($get('detalles'))->where('impuesto', '18')->reduce(function ($carry, $item) {
-                                            return $carry + (floatval($item['cantidad']) * floatval($item['costo']));
-                                        }, 0);
-                                        return $baseIva18 <= 0;
-                                    })
                                     ->schema([
                                         Placeholder::make('lbl_base_iva18')
                                             ->content('Subtotal IVA 18%')
@@ -625,12 +788,6 @@ class OrdenCompraResource extends Resource
                                     ]),
 
                                 Grid::make()->columns(2)->extraAttributes(['class' => 'flex justify-end gap-4'])
-                                    ->hidden(function (Get $get) {
-                                        $totalIva18 = collect($get('detalles'))->where('impuesto', '18')->reduce(function ($carry, $item) {
-                                            return $carry + (floatval($item['cantidad']) * floatval($item['costo']) * 0.18);
-                                        }, 0);
-                                        return $totalIva18 <= 0;
-                                    })
                                     ->schema([
                                         Placeholder::make('lbl_iva18')
                                             ->content('IVA 18%')
@@ -687,9 +844,6 @@ class OrdenCompraResource extends Resource
                             ]),
                     ])->columns(1),
 
-
-
-
             ])->live();
     }
 
@@ -699,20 +853,18 @@ class OrdenCompraResource extends Resource
             ->columns([
 
                 Tables\Columns\TextColumn::make('id')
-                    ->label('Codigo OC')
+                    ->label('Código OC')
                     ->searchable()
                     ->sortable(),
 
                 Tables\Columns\TextColumn::make('empresa.nombre_empresa')
-                    ->label('Conexion')
+                    ->label('Conexión')
                     ->sortable(),
 
                 Tables\Columns\TextColumn::make('amdg_id_empresa')
                     ->label('Empresa')
                     ->sortable()
                     ->getStateUsing(function (object $record) {
-                        // 1. Obtener los IDs necesarios del registro actual
-                        // Asumiendo que estos campos están disponibles en tu modelo principal ($record)
                         $empresaId = $record->id_empresa;
                         $amdg_id_empresa = $record->amdg_id_empresa;
 
@@ -720,15 +872,12 @@ class OrdenCompraResource extends Resource
                             return 'N/A (Faltan IDs)';
                         }
 
-                        // 2. Obtener el nombre de la conexión externa
-                        // *** Debes adaptar esta llamada a la función real de tu clase ***
                         $connectionName = self::getExternalConnectionName($empresaId);
 
                         if (!$connectionName) {
                             return 'N/A (No hay conexión)';
                         }
 
-                        // 3. Ejecutar la consulta a la base de datos externa para obtener el nombre
                         try {
                             $empresa = DB::connection($connectionName)
                                 ->table('saeempr')
@@ -736,9 +885,8 @@ class OrdenCompraResource extends Resource
                                 ->select(DB::raw(" '(' || empr_cod_empr || ') ' || empr_nom_empr AS nombre_empresa"))
                                 ->first();
 
-                            return $empresa->nombre_empresa ?? 'Empresa no encontrado';
+                            return $empresa->nombre_empresa ?? 'Empresa no encontrada';
                         } catch (\Exception $e) {
-                            // Manejar errores de conexión o consulta
                             return 'Error DB';
                         }
                     })
@@ -748,8 +896,6 @@ class OrdenCompraResource extends Resource
                     ->label('Sucursal')
                     ->sortable()
                     ->getStateUsing(function (object $record) {
-                        // 1. Obtener los IDs necesarios del registro actual
-                        // Asumiendo que estos campos están disponibles en tu modelo principal ($record)
                         $empresaId = $record->id_empresa;
                         $amdg_id_sucursal = $record->amdg_id_sucursal;
 
@@ -757,15 +903,12 @@ class OrdenCompraResource extends Resource
                             return 'N/A (Faltan IDs)';
                         }
 
-                        // 2. Obtener el nombre de la conexión externa
-                        // *** Debes adaptar esta llamada a la función real de tu clase ***
                         $connectionName = self::getExternalConnectionName($empresaId);
 
                         if (!$connectionName) {
                             return 'N/A (No hay conexión)';
                         }
 
-                        // 3. Ejecutar la consulta a la base de datos externa para obtener el nombre
                         try {
                             $sucursal = DB::connection($connectionName)
                                 ->table('saesucu')
@@ -773,9 +916,8 @@ class OrdenCompraResource extends Resource
                                 ->select(DB::raw(" '(' || sucu_cod_sucu || ') ' || sucu_nom_sucu AS nombre_sucursal"))
                                 ->first();
 
-                            return $sucursal->nombre_sucursal ?? 'Sucursal no encontrado';
+                            return $sucursal->nombre_sucursal ?? 'Sucursal no encontrada';
                         } catch (\Exception $e) {
-                            // Manejar errores de conexión o consulta
                             return 'Error DB';
                         }
                     })
@@ -823,7 +965,6 @@ class OrdenCompraResource extends Resource
                         'F' => 'FACTURA',
                         default => 'Desconocido',
                     })
-                    // Cambia (int $state) a (string $state)
                     ->color(fn(string $state): string => match ($state) {
                         'P' => 'warning',
                         'F' => 'success',
@@ -839,11 +980,10 @@ class OrdenCompraResource extends Resource
                         'REEMB' => 'REEMBOLSO',
                         'COMPRA' => 'COMPRA',
                         'PAGO' => 'PAGO',
-                        'REGUL' => 'REGULARIZACION',
+                        'REGUL' => 'REGULARIZACIÓN',
                         'CAJAC' => 'CAJA CHICA',
                         default => 'Desconocido',
                     })
-                    // Cambia (int $state) a (string $state)
                     ->color(fn(string $state): string => match ($state) {
                         'REEMB' => 'warning',
                         'COMPRA' => 'success',
@@ -858,7 +998,6 @@ class OrdenCompraResource extends Resource
                 Tables\Columns\TextColumn::make('presupuesto')
                     ->label('Formato')
                     ->badge()
-                    // Cambia (int $state) a (string $state)
                     ->color(fn(string $state): string => match ($state) {
                         'PB' => 'warning',
                         'AZ' => 'success',
@@ -869,6 +1008,7 @@ class OrdenCompraResource extends Resource
 
                 Tables\Columns\TextColumn::make('observaciones')
                     ->toggleable(isToggledHiddenByDefault: true),
+
                 Tables\Columns\TextColumn::make('subtotal')
                     ->money('USD')
                     ->toggleable(isToggledHiddenByDefault: true),
@@ -891,32 +1031,38 @@ class OrdenCompraResource extends Resource
                 Tables\Columns\TextColumn::make('pedidos_importados')
                     ->label('Pedidos Importados')
                     ->sortable(),
-
-
-
             ])
             ->filters([
                 // Aquí puedes añadir filtros si es necesario
             ])
             ->actions([
+
                 Tables\Actions\Action::make('pdf')
                     ->label('PDF')
                     ->icon('heroicon-o-arrow-down-tray')
                     ->color('success')
                     ->url(fn(OrdenCompra $record) => route('orden-compra.pdf', $record))
                     ->openUrlInNewTab(),
-                Tables\Actions\Action::make('verProductos')
-                    ->label('Ver Productos')
-                    ->icon('heroicon-o-eye')
-                    ->color('info')
-                    ->modalContent(fn(OrdenCompra $record): \Illuminate\Contracts\View\View => view(
-                        'filament.resources.orden-compra-resource.actions.ver-productos',
-                        ['detalles' => $record->detalles],
-                    ))
-                    ->modalSubmitAction(false)
-                    ->modalCancelAction(fn(StaticAction $action) => $action->label('Cerrar')),
+
+                /*
+                |--------------------------------------------------------------------------
+                | MODAL "Ver Productos" (DESACTIVADO TEMPORALMENTE)
+                |--------------------------------------------------------------------------
+                */
+                // Tables\Actions\Action::make('verProductos')
+                //     ->label('Ver Productos')
+                //     ->icon('heroicon-o-eye')
+                //     ->color('info')
+                //     ->modalContent(fn(OrdenCompra $record): \Illuminate\Contracts\View\View => view(
+                //         'filament.resources.orden-compra-resource.actions.ver-productos',
+                //         ['detalles' => $record->detalles],
+                //     ))
+                //     ->modalSubmitAction(false)
+                //     ->modalCancelAction(fn(StaticAction $action) => $action->label('Cerrar')),
+
                 Tables\Actions\EditAction::make()
                     ->visible(fn() => auth()->user()->can('Actualizar')),
+
                 Tables\Actions\DeleteAction::make()
                     ->visible(fn() => auth()->user()->can('Borrar'))
                     ->after(function ($record) {

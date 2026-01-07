@@ -19,6 +19,8 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Collection;
 use Filament\Actions\StaticAction;
 use Filament\Notifications\Notification;
+use Carbon\Carbon;
+use App\Models\OrdenCompra;
 
 class BuscarPedidosCompra extends Component implements HasForms, HasTable
 {
@@ -28,6 +30,7 @@ class BuscarPedidosCompra extends Component implements HasForms, HasTable
     public $id_empresa;
     public $amdg_id_empresa;
     public $amdg_id_sucursal;
+    public ?string $pedidos_importados = null;
 
     public ?array $data = [];
 
@@ -38,15 +41,16 @@ class BuscarPedidosCompra extends Component implements HasForms, HasTable
         }
     }
 
-    public function mount($id_empresa, $amdg_id_empresa, $amdg_id_sucursal): void
+    public function mount($id_empresa, $amdg_id_empresa, $amdg_id_sucursal, $pedidos_importados = null): void
     {
         $this->initializeForm();
         $this->id_empresa = $id_empresa;
         $this->amdg_id_empresa = $amdg_id_empresa;
         $this->amdg_id_sucursal = $amdg_id_sucursal;
+        $this->pedidos_importados = $pedidos_importados;
 
         $this->form->fill([
-            'fecha_desde' => now()->startOfDay(),
+            'fecha_desde' => Carbon::create(2026, 1, 1)->startOfDay(),
             'fecha_hasta' => now()->endOfDay(),
         ]);
     }
@@ -108,11 +112,16 @@ class BuscarPedidosCompra extends Component implements HasForms, HasTable
 
         $query = $model->newQuery()
             ->select('saepedi.*')
-            ->distinct('saepedi.pedi_cod_pedi')
+            ->distinct()
             ->join('saedped', 'saedped.dped_cod_pedi', '=', 'saepedi.pedi_cod_pedi')
             ->where('saepedi.pedi_cod_empr', $this->amdg_id_empresa)
             ->where('saepedi.pedi_cod_sucu', $this->amdg_id_sucursal)
             ->whereColumn('saedped.dped_can_ped', '>', 'saedped.dped_can_ent');
+
+        $pedidosImportados = $this->resolvePedidosImportados();
+        if (!empty($pedidosImportados)) {
+            $query->whereNotIn('saepedi.pedi_cod_pedi', $pedidosImportados);
+        }
 
         if (!empty($formData['fecha_desde']) && !empty($formData['fecha_hasta'])) {
             $query->whereBetween('saepedi.pedi_fec_pedi', [
@@ -123,11 +132,39 @@ class BuscarPedidosCompra extends Component implements HasForms, HasTable
         return $query;
     }
 
+    private function resolvePedidosImportados(): array
+    {
+        $fromForm = $this->parsePedidosImportados($this->pedidos_importados);
+
+        $fromOrders = OrdenCompra::query()
+            ->whereNotNull('pedidos_importados')
+            ->pluck('pedidos_importados')
+            ->flatMap(function ($value) {
+                return $this->parsePedidosImportados($value);
+            })
+            ->all();
+
+        return array_values(array_unique(array_filter(array_merge($fromForm, $fromOrders))));
+    }
+
+    private function parsePedidosImportados(?string $value): array
+    {
+        if (!$value) {
+            return [];
+        }
+
+        return collect(preg_split('/\\s*,\\s*/', trim($value)))
+            ->filter()
+            ->map(fn($pedido) => (int) ltrim((string) $pedido, '0'))
+            ->filter(fn($pedido) => $pedido > 0)
+            ->all();
+    }
 
     public function table(Table $table): Table
     {
         return $table
             ->query(fn() => $this->getTableQuery())
+            ->defaultSort('pedi_fec_pedi', 'desc')
             ->columns([
                 Tables\Columns\TextColumn::make('pedi_cod_pedi')
                     ->label('Secuencial')
@@ -186,6 +223,7 @@ class BuscarPedidosCompra extends Component implements HasForms, HasTable
 
                         // 🔥 CERRAR MODAL 100% SEGURO
                         $action->cancel();
+                        $this->dispatch('close-modal', id: 'filtrar-pedidos');
                     })
             ]);
 
