@@ -18,10 +18,6 @@ class CreateOrdenCompra extends CreateRecord
 
     protected function getRedirectUrl(): string
     {
-        if ($this->record) {
-            return route('orden-compra.pdf', $this->record);
-        }
-
         return $this->getResource()::getUrl('index');
     }
 
@@ -72,6 +68,13 @@ class CreateOrdenCompra extends CreateRecord
 
             return $record;
         });
+    }
+
+    protected function afterCreate(): void
+    {
+        if ($this->record) {
+            $this->dispatch('open-orden-compra-print', url: route('orden-compra.pdf', $this->record));
+        }
     }
 
     public function onPedidosSeleccionados($pedidos, $connectionId, $motivo)
