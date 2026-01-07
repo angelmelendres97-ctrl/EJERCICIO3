@@ -108,7 +108,7 @@ class CreateOrdenCompra extends CreateRecord
         // Group by both product code and warehouse code, but keep auxiliar products separate.
         $detallesAgrupados = $detalles->groupBy(function ($item) {
             if (!empty($item->dped_cod_auxiliar)) {
-                return 'aux-' . ($item->dped_det_deped ?? uniqid('', true));
+                return 'aux-' . ($item->dped_det_dped ?? uniqid('', true));
             }
 
             return $item->dped_cod_prod . '-' . $item->dped_cod_bode;
@@ -125,7 +125,10 @@ class CreateOrdenCompra extends CreateRecord
                 'dped_cod_bode' => $first->dped_cod_bode,
                 'es_auxiliar' => $esAuxiliar,
                 'auxiliar_codigo' => $first->dped_cod_auxiliar ?? null,
-                'auxiliar_nombre' => $first->dped_desc_axiliar ?? $first->deped_prod_nom ?? $first->dped_det_deped ?? null,
+                'auxiliar_nombre' => $first->dped_det_dped
+                    ?? $first->dped_desc_axiliar
+                    ?? $first->deped_prod_nom
+                    ?? null,
             ];
         })->where('cantidad_pendiente', '>', 0); // Filter out fully delivered items
 
@@ -163,9 +166,9 @@ class CreateOrdenCompra extends CreateRecord
 
                 if ($detalle->es_auxiliar) {
                     $auxiliarDescripcion = trim(collect([
-                        $detalle->auxiliar_codigo ? 'Código: ' . $detalle->auxiliar_codigo : null,
-                        $detalle->auxiliar_nombre,
-                    ])->filter()->implode(' - '));
+                        $detalle->auxiliar_codigo ? 'Código auxiliar: ' . $detalle->auxiliar_codigo : null,
+                        $detalle->auxiliar_nombre ? 'Descripción: ' . $detalle->auxiliar_nombre : null,
+                    ])->filter()->implode(' | '));
                 }
 
                 return [
@@ -174,6 +177,7 @@ class CreateOrdenCompra extends CreateRecord
                     'producto' => $detalle->es_auxiliar ? null : $productoNombre,
                     'es_auxiliar' => $detalle->es_auxiliar,
                     'producto_auxiliar' => $auxiliarDescripcion,
+
                     'cantidad' => $detalle->cantidad_pendiente,
                     'costo' => $costo,
                     'descuento' => 0,
@@ -242,5 +246,4 @@ class CreateOrdenCompra extends CreateRecord
             ->values()
             ->all();
     }
-
 }
