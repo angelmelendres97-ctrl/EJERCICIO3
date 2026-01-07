@@ -37,6 +37,8 @@ class CreateOrdenCompra extends CreateRecord
 
     protected function mutateFormDataBeforeCreate(array $data): array
     {
+        $data['id_usuario'] = auth()->id();
+
         $newDetalles = [];
         if (isset($data['detalles']) && is_array($data['detalles'])) {
             foreach ($data['detalles'] as $detalle) {
@@ -103,6 +105,21 @@ class CreateOrdenCompra extends CreateRecord
 
         $this->data['uso_compra'] = $motivo;
 
+        $solicitadosActuales = $this->normalizeSolicitadoPor($this->data['solicitado_por'] ?? null);
+        $solicitadosImportados = DB::connection($connectionName)
+            ->table('saepedi')
+            ->whereIn('pedi_cod_pedi', $pedidos)
+            ->pluck('pedi_res_pedi')
+            ->map(fn($nombre) => trim((string) $nombre))
+            ->filter()
+            ->values()
+            ->all();
+
+        $solicitadosUnicos = array_values(array_unique(array_merge($solicitadosActuales, $solicitadosImportados)));
+        if (!empty($solicitadosUnicos)) {
+            $this->data['solicitado_por'] = implode(', ', $solicitadosUnicos);
+        }
+
         $detalles = DB::connection($connectionName)
             ->table('saedped')
             ->whereIn('dped_cod_pedi', $pedidos)
@@ -111,6 +128,10 @@ class CreateOrdenCompra extends CreateRecord
 
         // Group by both product code and warehouse code, but keep auxiliar products separate.
         $detallesAgrupados = $detalles->groupBy(function ($item) {
+            if ($this->isServicioCodigo($item->dped_cod_prod ?? null)) {
+                return 'serv-' . uniqid('', true);
+            }
+
             if (!empty($item->dped_cod_auxiliar)) {
                 return 'aux-' . ($item->dped_det_dped ?? uniqid('', true));
             }
@@ -122,15 +143,20 @@ class CreateOrdenCompra extends CreateRecord
             $cantidadEntregada = $group->sum(fn($i) => (float) $i->dped_can_ent);
             $cantidadPendiente = $cantidadPedida - $cantidadEntregada;
             $esAuxiliar = !empty($first->dped_cod_auxiliar);
+            $esServicio = $this->isServicioCodigo($first->dped_cod_prod ?? null);
 
             return (object) [
                 'dped_cod_prod' => $first->dped_cod_prod,
                 'cantidad_pendiente' => $cantidadPendiente,
                 'dped_cod_bode' => $first->dped_cod_bode,
                 'es_auxiliar' => $esAuxiliar,
+                'es_servicio' => $esServicio,
                 'auxiliar_codigo' => $first->dped_cod_auxiliar ?? null,
                 'auxiliar_nombre' => $first->dped_det_dped
                     ?? $first->dped_desc_axiliar
+                    ?? $first->deped_prod_nom
+                    ?? null,
+                'servicio_nombre' => $first->dped_det_dped
                     ?? $first->deped_prod_nom
                     ?? null,
             ];
@@ -144,6 +170,7 @@ class CreateOrdenCompra extends CreateRecord
                 $costo = 0;
                 $impuesto = 0;
                 $productoNombre = 'Producto no encontrado';
+                $productData = null;
 
                 if (!$detalle->es_auxiliar) {
                     $productData = DB::connection($connectionName)
@@ -165,8 +192,16 @@ class CreateOrdenCompra extends CreateRecord
                     }
                 }
 
+                if ($detalle->es_servicio && $productData === null) {
+                    $productoNombre = trim(collect([
+                        $detalle->dped_cod_prod ? 'Servicio ' . $detalle->dped_cod_prod : null,
+                        $detalle->servicio_nombre,
+                    ])->filter()->implode(' - '));
+                }
+
                 $valor_impuesto = (floatval($detalle->cantidad_pendiente) * floatval($costo)) * (floatval($impuesto) / 100);
                 $auxiliarDescripcion = null;
+                $servicioDescripcion = null;
 
                 if ($detalle->es_auxiliar) {
                     $auxiliarDescripcion = trim(collect([
@@ -175,12 +210,21 @@ class CreateOrdenCompra extends CreateRecord
                     ])->filter()->implode(' | '));
                 }
 
+                if ($detalle->es_servicio) {
+                    $servicioDescripcion = trim(collect([
+                        $detalle->dped_cod_prod ? 'Código servicio: ' . $detalle->dped_cod_prod : null,
+                        $detalle->servicio_nombre ? 'Descripción: ' . $detalle->servicio_nombre : null,
+                    ])->filter()->implode(' | '));
+                }
+
                 return [
                     'id_bodega' => $id_bodega_item, // Set the correct warehouse for this line
                     'codigo_producto' => $detalle->es_auxiliar ? null : $detalle->dped_cod_prod,
                     'producto' => $detalle->es_auxiliar ? null : $productoNombre,
                     'es_auxiliar' => $detalle->es_auxiliar,
+                    'es_servicio' => $detalle->es_servicio,
                     'producto_auxiliar' => $auxiliarDescripcion,
+                    'producto_servicio' => $servicioDescripcion,
 
                     'cantidad' => $detalle->cantidad_pendiente,
                     'costo' => $costo,
@@ -249,5 +293,30 @@ class CreateOrdenCompra extends CreateRecord
             ->filter(fn($pedido) => $pedido > 0)
             ->values()
             ->all();
+    }
+
+    private function normalizeSolicitadoPor(array|string|null $solicitado): array
+    {
+        if (empty($solicitado)) {
+            return [];
+        }
+
+        $lista = is_array($solicitado) ? $solicitado : preg_split('/\\s*,\\s*/', trim((string) $solicitado));
+
+        return collect($lista)
+            ->filter()
+            ->map(fn($nombre) => trim((string) $nombre))
+            ->filter()
+            ->values()
+            ->all();
+    }
+
+    private function isServicioCodigo(?string $codigo): bool
+    {
+        if (!$codigo) {
+            return false;
+        }
+
+        return (bool) preg_match('/^SP[\\s\\-_]*SP[\\s\\-_]*SP/i', $codigo);
     }
 }

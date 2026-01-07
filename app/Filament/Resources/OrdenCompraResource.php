@@ -207,7 +207,6 @@ class OrdenCompraResource extends Resource
                         Forms\Components\TextInput::make('solicitado_por')
                             ->label('Solicitado Por:')
                             ->required()
-                            ->default(fn() => auth()->user()?->name)
                             ->maxLength(2550)
                             ->columnSpan(2),
 
@@ -423,12 +422,20 @@ class OrdenCompraResource extends Resource
                                 Grid::make(14)
                                     ->schema([
                                         Forms\Components\Hidden::make('es_auxiliar'),
+                                        Forms\Components\Hidden::make('es_servicio'),
 
                                         Forms\Components\TextInput::make('producto_auxiliar')
                                             ->label('Producto auxiliar')
                                             ->disabled()
                                             ->dehydrated(false)
                                             ->visible(fn(Get $get) => (bool) $get('es_auxiliar'))
+                                            ->columnSpan(['default' => 12, 'lg' => 14]),
+
+                                        Forms\Components\TextInput::make('producto_servicio')
+                                            ->label('Ítem de servicio')
+                                            ->disabled()
+                                            ->dehydrated(false)
+                                            ->visible(fn(Get $get) => (bool) $get('es_servicio'))
                                             ->columnSpan(['default' => 12, 'lg' => 14]),
 
                                         Forms\Components\Select::make('id_bodega')
@@ -504,7 +511,7 @@ class OrdenCompraResource extends Resource
                                             })
                                             ->searchable()
                                             ->live()
-                                            ->required()
+                                            ->required(fn(Get $get) => !(bool) $get('es_servicio'))
                                             ->helperText(fn(Get $get) => (bool) $get('es_auxiliar')
                                                 ? 'Seleccione un producto real del inventario para reemplazar el auxiliar.'
                                                 : null)
@@ -1002,6 +1009,27 @@ class OrdenCompraResource extends Resource
                 Tables\Columns\TextColumn::make('proveedor')
                     ->searchable()
                     ->sortable(),
+
+                Tables\Columns\TextColumn::make('usuario.name')
+                    ->label('Creado por')
+                    ->sortable(),
+
+                Tables\Columns\TextColumn::make('grupo_resumen')
+                    ->label('Grupo Resumen')
+                    ->getStateUsing(function (OrdenCompra $record) {
+                        $nombres = $record->resumenPedidos
+                            ->pluck('descripcion')
+                            ->filter()
+                            ->unique()
+                            ->values();
+
+                        if ($nombres->isEmpty()) {
+                            return 'Sin grupo de resumen';
+                        }
+
+                        return $nombres->implode(', ');
+                    })
+                    ->toggleable(isToggledHiddenByDefault: true),
 
                 Tables\Columns\TextColumn::make('trasanccion')
                     ->label('Transacción')

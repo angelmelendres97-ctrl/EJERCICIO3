@@ -3,11 +3,14 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
+use App\Models\ResumenPedidos;
+use App\Models\User;
 
 class OrdenCompra extends Model
 {
     protected $fillable = [
         'id_empresa',
+        'id_usuario',
         'amdg_id_empresa',
         'amdg_id_sucursal',
         'uso_compra',
@@ -46,9 +49,24 @@ class OrdenCompra extends Model
         return $this->belongsTo(Empresa::class, 'id_empresa');
     }
 
+    public function usuario()
+    {
+        return $this->belongsTo(User::class, 'id_usuario');
+    }
+
     public function detalles()
     {
         return $this->hasMany(DetalleOrdenCompra::class, 'id_orden_compra');
+    }
+
+    public function resumenPedidos()
+    {
+        return $this->belongsToMany(
+            ResumenPedidos::class,
+            'detalle_resumen_pedidos',
+            'id_orden_compra',
+            'id_resumen_pedidos'
+        );
     }
 
     protected static function booted()
