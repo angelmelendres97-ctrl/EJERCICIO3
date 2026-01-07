@@ -48,6 +48,14 @@ class EditOrdenCompra extends EditRecord
             ->get();
 
         $detallesAgrupados = $detalles->groupBy(function ($item) {
+            if (!empty($item->dped_cod_auxiliar)) {
+                return 'aux-' . ($item->dped_det_dped ?? uniqid('', true));
+            }
+
+            if ($this->isServicioItem($item->dped_cod_prod ?? null)) {
+                return 'servicio-' . ($item->dped_cod_pedi ?? 'pedido') . '-' . ($item->dped_cod_bode ?? 'bode') . '-' . uniqid('', true);
+            }
+
             return $item->dped_cod_prod . '-' . $item->dped_cod_bode;
         })->map(function ($group) {
             $first = $group->first();
@@ -57,6 +65,17 @@ class EditOrdenCompra extends EditRecord
                 'dped_cod_prod' => $first->dped_cod_prod,
                 'cantidad_pendiente' => $cantidadPedida - $cantidadEntregada,
                 'dped_cod_bode' => $first->dped_cod_bode,
+                'es_auxiliar' => !empty($first->dped_cod_auxiliar),
+                'es_servicio' => $this->isServicioItem($first->dped_cod_prod ?? null),
+                'auxiliar_codigo' => $first->dped_cod_auxiliar ?? null,
+                'auxiliar_nombre' => $first->dped_det_dped
+                    ?? $first->dped_desc_axiliar
+                    ?? $first->deped_prod_nom
+                    ?? null,
+                'servicio_nombre' => $first->dped_det_dped
+                    ?? $first->dped_desc_axiliar
+                    ?? $first->deped_prod_nom
+                    ?? null,
             ];
         })->where('cantidad_pendiente', '>', 0);
 
@@ -64,34 +83,56 @@ class EditOrdenCompra extends EditRecord
             $repeaterItems = $detallesAgrupados->map(function ($detalle) use ($connectionName) {
                 $id_bodega_item = $detalle->dped_cod_bode;
 
-                $productData = DB::connection($connectionName)
-                    ->table('saeprod')
-                    ->join('saeprbo', 'prbo_cod_prod', '=', 'prod_cod_prod')
-                    ->where('prod_cod_empr', $this->data['amdg_id_empresa'])
-                    ->where('prod_cod_sucu', $this->data['amdg_id_sucursal'])
-                    ->where('prbo_cod_empr', $this->data['amdg_id_empresa'])
-                    ->where('prbo_cod_sucu', $this->data['amdg_id_sucursal'])
-                    ->where('prbo_cod_bode', $id_bodega_item)
-                    ->where('prod_cod_prod', $detalle->dped_cod_prod)
-                    ->select('prbo_uco_prod', 'prbo_iva_porc', 'prod_nom_prod')
-                    ->first();
-
                 $costo = 0;
                 $impuesto = 0;
                 $productoNombre = 'Producto no encontrado';
 
-                if ($productData) {
-                    $costo = number_format($productData->prbo_uco_prod, 6, '.', '');
-                    $impuesto = round($productData->prbo_iva_porc, 2);
-                    $productoNombre = $productData->prod_nom_prod . ' (' . $detalle->dped_cod_prod . ')';
+                if (!$detalle->es_auxiliar && !$detalle->es_servicio) {
+                    $productData = DB::connection($connectionName)
+                        ->table('saeprod')
+                        ->join('saeprbo', 'prbo_cod_prod', '=', 'prod_cod_prod')
+                        ->where('prod_cod_empr', $this->data['amdg_id_empresa'])
+                        ->where('prod_cod_sucu', $this->data['amdg_id_sucursal'])
+                        ->where('prbo_cod_empr', $this->data['amdg_id_empresa'])
+                        ->where('prbo_cod_sucu', $this->data['amdg_id_sucursal'])
+                        ->where('prbo_cod_bode', $id_bodega_item)
+                        ->where('prod_cod_prod', $detalle->dped_cod_prod)
+                        ->select('prbo_uco_prod', 'prbo_iva_porc', 'prod_nom_prod')
+                        ->first();
+
+                    if ($productData) {
+                        $costo = number_format($productData->prbo_uco_prod, 6, '.', '');
+                        $impuesto = round($productData->prbo_iva_porc, 2);
+                        $productoNombre = $productData->prod_nom_prod . ' (' . $detalle->dped_cod_prod . ')';
+                    }
                 }
 
                 $valor_impuesto = (floatval($detalle->cantidad_pendiente) * floatval($costo)) * (floatval($impuesto) / 100);
 
+                $auxiliarDescripcion = null;
+                if ($detalle->es_auxiliar) {
+                    $auxiliarDescripcion = trim(collect([
+                        $detalle->auxiliar_codigo ? 'Código auxiliar: ' . $detalle->auxiliar_codigo : null,
+                        $detalle->auxiliar_nombre ? 'Descripción: ' . $detalle->auxiliar_nombre : null,
+                    ])->filter()->implode(' | '));
+                }
+
+                $servicioDescripcion = null;
+                if ($detalle->es_servicio) {
+                    $servicioDescripcion = trim(collect([
+                        $detalle->dped_cod_prod ? 'Código servicio: ' . $detalle->dped_cod_prod : null,
+                        $detalle->servicio_nombre ? 'Descripción: ' . $detalle->servicio_nombre : null,
+                    ])->filter()->implode(' | '));
+                }
+
                 return [
                     'id_bodega' => $id_bodega_item,
-                    'codigo_producto' => $detalle->dped_cod_prod,
-                    'producto' => $productoNombre,
+                    'codigo_producto' => ($detalle->es_auxiliar || $detalle->es_servicio) ? null : $detalle->dped_cod_prod,
+                    'producto' => ($detalle->es_auxiliar || $detalle->es_servicio) ? null : $productoNombre,
+                    'es_auxiliar' => $detalle->es_auxiliar,
+                    'es_servicio' => $detalle->es_servicio,
+                    'producto_auxiliar' => $auxiliarDescripcion,
+                    'producto_servicio' => $servicioDescripcion,
                     'cantidad' => $detalle->cantidad_pendiente,
                     'costo' => $costo,
                     'descuento' => 0,
@@ -107,6 +148,8 @@ class EditOrdenCompra extends EditRecord
             // Recalculate totals after merging
             $this->recalculateTotals();
         }
+
+        $this->applySolicitadoPor($connectionName, $this->parsePedidosImportados($this->data['pedidos_importados'] ?? ''));
 
         $this->dispatch('close-modal', id: 'filtrar-pedidos');
     }
@@ -137,6 +180,50 @@ class EditOrdenCompra extends EditRecord
         
         // This is crucial to make the form's total display update in real-time
         $this->form->fill($this->data);
+    }
+
+    private function isServicioItem(?string $codigoProducto): bool
+    {
+        if (!$codigoProducto) {
+            return false;
+        }
+
+        return (bool) preg_match('/^SP[-\\s]*SP[-\\s]*SP/i', $codigoProducto);
+    }
+
+    private function parsePedidosImportados(?string $value): array
+    {
+        if (!$value) {
+            return [];
+        }
+
+        return collect(preg_split('/\\s*,\\s*/', trim($value)))
+            ->filter()
+            ->map(fn($pedido) => (int) ltrim((string) $pedido, '0'))
+            ->filter(fn($pedido) => $pedido > 0)
+            ->values()
+            ->all();
+    }
+
+    private function applySolicitadoPor(string $connectionName, array $pedidos): void
+    {
+        if (empty($pedidos)) {
+            return;
+        }
+
+        $solicitantes = DB::connection($connectionName)
+            ->table('saepedi')
+            ->whereIn('pedi_cod_pedi', $pedidos)
+            ->pluck('pedi_res_pedi')
+            ->filter(fn($value) => !empty(trim((string) $value)))
+            ->map(fn($value) => trim((string) $value))
+            ->unique()
+            ->values();
+
+        if ($solicitantes->isNotEmpty()) {
+            $this->data['solicitado_por'] = $solicitantes->implode(', ');
+            $this->form->fill($this->data);
+        }
     }
 
     protected function mutateFormDataBeforeSave(array $data): array

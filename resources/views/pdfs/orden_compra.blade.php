@@ -430,12 +430,20 @@
             </div>
 
             <div class="signatures">
+                @php
+                    $nombreUsuario = $ordenCompra->usuario?->name ?? '';
+                    $iniciales = collect(preg_split('/\\s+/', trim($nombreUsuario)))
+                        ->filter()
+                        ->map(fn($parte) => mb_strtoupper(mb_substr($parte, 0, 1)))
+                        ->implode('.');
+                    $iniciales = $iniciales ? $iniciales . '.' : '';
+                @endphp
                 <table class="sign-table">
                     <tr>
                         <td class="sign-cell">
                             <div class="sign-line"></div>
                             <div class="sign-label"><b>Elaborado por</b></div>
-                            <div class="sign-role"><b>COMPRAS</b></div>
+                            <div class="sign-role"><b>{{ $iniciales ?: 'COMPRAS' }}</b></div>
                         </td>
 
                         <td class="sign-cell">

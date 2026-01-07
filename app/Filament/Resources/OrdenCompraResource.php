@@ -31,6 +31,7 @@ use Filament\Forms\Components\View;
 use Filament\Actions\StaticAction;
 use Illuminate\Database\Eloquent\Model; // ESTA LÍNEA ES NECESARIA
 use Filament\Notifications\Notification;
+use Illuminate\Database\Eloquent\Builder;
 
 class OrdenCompraResource extends Resource
 {
@@ -207,7 +208,6 @@ class OrdenCompraResource extends Resource
                         Forms\Components\TextInput::make('solicitado_por')
                             ->label('Solicitado Por:')
                             ->required()
-                            ->default(fn() => auth()->user()?->name)
                             ->maxLength(2550)
                             ->columnSpan(2),
 
@@ -423,12 +423,20 @@ class OrdenCompraResource extends Resource
                                 Grid::make(14)
                                     ->schema([
                                         Forms\Components\Hidden::make('es_auxiliar'),
+                                        Forms\Components\Hidden::make('es_servicio'),
 
                                         Forms\Components\TextInput::make('producto_auxiliar')
                                             ->label('Producto auxiliar')
                                             ->disabled()
                                             ->dehydrated(false)
                                             ->visible(fn(Get $get) => (bool) $get('es_auxiliar'))
+                                            ->columnSpan(['default' => 12, 'lg' => 14]),
+
+                                        Forms\Components\TextInput::make('producto_servicio')
+                                            ->label('Servicio')
+                                            ->disabled()
+                                            ->dehydrated(false)
+                                            ->visible(fn(Get $get) => (bool) $get('es_servicio'))
                                             ->columnSpan(['default' => 12, 'lg' => 14]),
 
                                         Forms\Components\Select::make('id_bodega')
@@ -507,7 +515,9 @@ class OrdenCompraResource extends Resource
                                             ->required()
                                             ->helperText(fn(Get $get) => (bool) $get('es_auxiliar')
                                                 ? 'Seleccione un producto real del inventario para reemplazar el auxiliar.'
-                                                : null)
+                                                : ((bool) $get('es_servicio')
+                                                    ? 'Seleccione un producto real del inventario para reemplazar el servicio.'
+                                                    : null))
                                             ->columnSpan(['default' => 12, 'lg' => 3])
                                             ->afterStateUpdated(function (Set $set, Get $get, ?string $state) {
                                                 if (empty($state)) {
@@ -1003,6 +1013,11 @@ class OrdenCompraResource extends Resource
                     ->searchable()
                     ->sortable(),
 
+                Tables\Columns\TextColumn::make('usuario.name')
+                    ->label('Usuario')
+                    ->sortable()
+                    ->toggleable(),
+
                 Tables\Columns\TextColumn::make('trasanccion')
                     ->label('Transacción')
                     ->searchable()
@@ -1099,6 +1114,11 @@ class OrdenCompraResource extends Resource
                     ->label('Total')
                     ->sortable(),
 
+                Tables\Columns\TextColumn::make('resumenDetalle.resumenPedido.descripcion')
+                    ->label('Grupo Resumen')
+                    ->getStateUsing(fn(OrdenCompra $record) => $record->resumenDetalle?->resumenPedido?->descripcion ?? 'Sin grupo de resumen')
+                    ->toggleable(),
+
                 Tables\Columns\TextColumn::make('pedidos_importados')
                     ->label('Pedidos Importados')
                     ->sortable(),
@@ -1143,6 +1163,12 @@ class OrdenCompraResource extends Resource
             ->bulkActions([
                 // Acciones masivas
             ]);
+    }
+
+    public static function getEloquentQuery(): Builder
+    {
+        return parent::getEloquentQuery()
+            ->with(['usuario', 'resumenDetalle.resumenPedido']);
     }
 
     public static function getRelations(): array

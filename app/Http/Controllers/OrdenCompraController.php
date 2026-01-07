@@ -21,7 +21,7 @@ class OrdenCompraController extends Controller
     public function descargarPdf(OrdenCompra $ordenCompra)
     {
         // It is a good practice to load all necessary relationships to avoid N+1 problems in the view.
-        $ordenCompra->load('detalles', 'empresa');
+        $ordenCompra->load('detalles', 'empresa', 'usuario');
 
         // The view 'pdfs.orden_compra' will be created in the next step.
         $pdf = Pdf::loadView('pdfs.orden_compra', ['ordenCompra' => $ordenCompra]);

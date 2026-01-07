@@ -37,6 +37,7 @@ class CreateOrdenCompra extends CreateRecord
 
     protected function mutateFormDataBeforeCreate(array $data): array
     {
+        $data['id_usuario'] = $data['id_usuario'] ?? auth()->id();
         $newDetalles = [];
         if (isset($data['detalles']) && is_array($data['detalles'])) {
             foreach ($data['detalles'] as $detalle) {
@@ -109,10 +110,14 @@ class CreateOrdenCompra extends CreateRecord
             ->whereColumn('dped_can_ped', '>', 'dped_can_ent')
             ->get();
 
-        // Group by both product code and warehouse code, but keep auxiliar products separate.
+        // Group by both product code and warehouse code, but keep auxiliar/service items separate.
         $detallesAgrupados = $detalles->groupBy(function ($item) {
             if (!empty($item->dped_cod_auxiliar)) {
                 return 'aux-' . ($item->dped_det_dped ?? uniqid('', true));
+            }
+
+            if ($this->isServicioItem($item->dped_cod_prod ?? null)) {
+                return 'servicio-' . ($item->dped_cod_pedi ?? 'pedido') . '-' . ($item->dped_cod_bode ?? 'bode') . '-' . uniqid('', true);
             }
 
             return $item->dped_cod_prod . '-' . $item->dped_cod_bode;
@@ -122,14 +127,20 @@ class CreateOrdenCompra extends CreateRecord
             $cantidadEntregada = $group->sum(fn($i) => (float) $i->dped_can_ent);
             $cantidadPendiente = $cantidadPedida - $cantidadEntregada;
             $esAuxiliar = !empty($first->dped_cod_auxiliar);
+            $esServicio = $this->isServicioItem($first->dped_cod_prod ?? null);
 
             return (object) [
                 'dped_cod_prod' => $first->dped_cod_prod,
                 'cantidad_pendiente' => $cantidadPendiente,
                 'dped_cod_bode' => $first->dped_cod_bode,
                 'es_auxiliar' => $esAuxiliar,
+                'es_servicio' => $esServicio,
                 'auxiliar_codigo' => $first->dped_cod_auxiliar ?? null,
                 'auxiliar_nombre' => $first->dped_det_dped
+                    ?? $first->dped_desc_axiliar
+                    ?? $first->deped_prod_nom
+                    ?? null,
+                'servicio_nombre' => $first->dped_det_dped
                     ?? $first->dped_desc_axiliar
                     ?? $first->deped_prod_nom
                     ?? null,
@@ -145,7 +156,7 @@ class CreateOrdenCompra extends CreateRecord
                 $impuesto = 0;
                 $productoNombre = 'Producto no encontrado';
 
-                if (!$detalle->es_auxiliar) {
+                if (!$detalle->es_auxiliar && !$detalle->es_servicio) {
                     $productData = DB::connection($connectionName)
                         ->table('saeprod')
                         ->join('saeprbo', 'prbo_cod_prod', '=', 'prod_cod_prod')
@@ -175,12 +186,23 @@ class CreateOrdenCompra extends CreateRecord
                     ])->filter()->implode(' | '));
                 }
 
+                $servicioDescripcion = null;
+
+                if ($detalle->es_servicio) {
+                    $servicioDescripcion = trim(collect([
+                        $detalle->dped_cod_prod ? 'Código servicio: ' . $detalle->dped_cod_prod : null,
+                        $detalle->servicio_nombre ? 'Descripción: ' . $detalle->servicio_nombre : null,
+                    ])->filter()->implode(' | '));
+                }
+
                 return [
                     'id_bodega' => $id_bodega_item, // Set the correct warehouse for this line
-                    'codigo_producto' => $detalle->es_auxiliar ? null : $detalle->dped_cod_prod,
-                    'producto' => $detalle->es_auxiliar ? null : $productoNombre,
+                    'codigo_producto' => ($detalle->es_auxiliar || $detalle->es_servicio) ? null : $detalle->dped_cod_prod,
+                    'producto' => ($detalle->es_auxiliar || $detalle->es_servicio) ? null : $productoNombre,
                     'es_auxiliar' => $detalle->es_auxiliar,
+                    'es_servicio' => $detalle->es_servicio,
                     'producto_auxiliar' => $auxiliarDescripcion,
+                    'producto_servicio' => $servicioDescripcion,
 
                     'cantidad' => $detalle->cantidad_pendiente,
                     'costo' => $costo,
@@ -216,6 +238,8 @@ class CreateOrdenCompra extends CreateRecord
             $this->data['total'] = number_format($totalGeneral, 2, '.', '');
         }
 
+        $this->applySolicitadoPor($connectionName, $pedidosUnicos);
+
         // Use a more specific event name if needed, or just close the generic modal
         $this->dispatch('close-modal', id: 'filtrar-pedidos');
     }
@@ -225,12 +249,14 @@ class CreateOrdenCompra extends CreateRecord
         $detalles = $this->data['detalles'] ?? [];
 
         $faltantes = collect($detalles)->filter(function ($detalle) {
-            return !empty($detalle['es_auxiliar']) && empty($detalle['codigo_producto']);
+            $requiereProducto = !empty($detalle['es_auxiliar']) || !empty($detalle['es_servicio']);
+
+            return $requiereProducto && empty($detalle['codigo_producto']);
         });
 
         if ($faltantes->isNotEmpty()) {
             throw ValidationException::withMessages([
-                'detalles' => 'Debe seleccionar un producto del inventario para cada ítem auxiliar.',
+                'detalles' => 'Debe seleccionar un producto del inventario para cada ítem auxiliar o de servicio.',
             ]);
         }
     }
@@ -249,5 +275,34 @@ class CreateOrdenCompra extends CreateRecord
             ->filter(fn($pedido) => $pedido > 0)
             ->values()
             ->all();
+    }
+
+    private function isServicioItem(?string $codigoProducto): bool
+    {
+        if (!$codigoProducto) {
+            return false;
+        }
+
+        return (bool) preg_match('/^SP[-\\s]*SP[-\\s]*SP/i', $codigoProducto);
+    }
+
+    private function applySolicitadoPor(string $connectionName, array $pedidos): void
+    {
+        if (empty($pedidos)) {
+            return;
+        }
+
+        $solicitantes = DB::connection($connectionName)
+            ->table('saepedi')
+            ->whereIn('pedi_cod_pedi', $pedidos)
+            ->pluck('pedi_res_pedi')
+            ->filter(fn($value) => !empty(trim((string) $value)))
+            ->map(fn($value) => trim((string) $value))
+            ->unique()
+            ->values();
+
+        if ($solicitantes->isNotEmpty()) {
+            $this->data['solicitado_por'] = $solicitantes->implode(', ');
+        }
     }
 }
