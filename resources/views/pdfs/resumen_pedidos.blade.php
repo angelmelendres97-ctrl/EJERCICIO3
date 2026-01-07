@@ -20,7 +20,7 @@
             width: 100%;
             max-width: 1000px;
             margin: 0 auto;
-            padding: 0px;
+            padding: 0 0 90px;
         }
 
         .header-date {
@@ -101,6 +101,43 @@
             clear: both;
         }
 
+        .signatures {
+            margin-top: 45px;
+        }
+
+        .sign-table {
+            width: 100%;
+            border-collapse: collapse;
+            border: none;
+        }
+
+        .sign-table td {
+            border: none;
+            padding: 0;
+        }
+
+        .sign-cell {
+            width: 50%;
+            text-align: center;
+            padding-top: 35px;
+        }
+
+        .sign-line {
+            border-top: 1px solid #000;
+            width: 80%;
+            margin: 0 auto 6px auto;
+            height: 1px;
+        }
+
+        .sign-label {
+            font-size: 11px;
+            margin-bottom: 3px;
+        }
+
+        .sign-role {
+            font-size: 11px;
+        }
+
         @page {
             size: A4 landscape;
             margin: 20px;
@@ -152,7 +189,8 @@
                     <th style="width:35px">Proveedor</th>
                     <th style="width:20px">Detalle</th>
                     <th style="width:15px">Pedido</th>
-                    <th style="width:15px">Orden Compra</th>
+                    <th style="width:12px">Num. Documento</th>
+                    <th style="width:12px">Orden Compra</th>
                     <th style="width:5px">Total</th>
                 </tr>
             </thead>
@@ -175,6 +213,7 @@
                         <td class="left">{{ $data_orden_compra->proveedor }}</td>
                         <td class="left">{{ strtoupper($data_orden_compra->observaciones) }}</td>
                         <td class="left">{{ $data_orden_compra->pedidos_importados }}</td>
+                        <td class="left">{{ $data_orden_compra->numero_factura_proforma ?? '' }}</td>
                         <td class="left">{{ str_pad($data_orden_compra->id, 8, '0', STR_PAD_LEFT) }}</td>
                         <td class="right">$ {{ number_format($data_orden_compra->total, 2) }}</td>
                     </tr>
@@ -205,6 +244,32 @@
             </div>
 
             <div class="clearfix"></div>
+        </div>
+
+        @php
+            $nombreUsuario = $resumen->usuario?->name ?? '';
+            $iniciales = collect(preg_split('/\\s+/', trim($nombreUsuario)))
+                ->filter()
+                ->map(fn($parte) => mb_strtoupper(mb_substr($parte, 0, 1)))
+                ->implode('.');
+            $iniciales = $iniciales ? $iniciales . '.' : '';
+        @endphp
+
+        <div class="signatures">
+            <table class="sign-table">
+                <tr>
+                    <td class="sign-cell">
+                        <div class="sign-line"></div>
+                        <div class="sign-label"><b>REVISADO</b></div>
+                    </td>
+
+                    <td class="sign-cell">
+                        <div class="sign-line"></div>
+                        <div class="sign-label"><b>Elaborado por</b></div>
+                        <div class="sign-role"><b>{{ $iniciales }}</b></div>
+                    </td>
+                </tr>
+            </table>
         </div>
 
     </div>

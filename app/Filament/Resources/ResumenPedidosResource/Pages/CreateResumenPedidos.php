@@ -19,6 +19,8 @@ class CreateResumenPedidos extends CreateRecord
 
     protected function mutateFormDataBeforeCreate(array $data): array
     {
+        $data['id_usuario'] = $data['id_usuario'] ?? auth()->id();
+
         // Calculate the next sequential number
         $nextSecuencial = (ResumenPedidos::max('codigo_secuencial') ?? 0) + 1;
         $data['codigo_secuencial'] = $nextSecuencial;
