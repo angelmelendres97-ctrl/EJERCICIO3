@@ -400,6 +400,11 @@ class OrdenCompraResource extends Resource
                         Forms\Components\Textarea::make('observaciones')
                             ->label('Observaciones')
                             ->maxLength(65535)
+                            ->reactive()
+                            ->afterStateUpdated(function (string|null $state, Set $set): void {
+                                $set('observaciones', $state ? mb_strtoupper($state) : $state);
+                            })
+                            ->dehydrateStateUsing(fn(?string $state) => $state ? mb_strtoupper($state) : $state)
                             ->columnSpanFull(),
                     ])->columns(4),
 

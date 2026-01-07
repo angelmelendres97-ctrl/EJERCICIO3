@@ -256,7 +256,7 @@
 
         <div class="header-block">
             <div class="title-main">INMOBILIARIA BUENA RENTA SA</div>
-            <div class="title-sub">ORDEN DE COMPRA N.- {{ $ordenCompra->numero_oc ?? '0000000' }}</div>
+            <div class="title-sub">ORDEN DE COMPRA N.- {{ str_pad($ordenCompra->id, 8, '0', STR_PAD_LEFT) }}</div>
 
             @php
                 $nombre_formato_oc = $ordenCompra->formato == 'P' ? 'Proforma' : 'Factura';
