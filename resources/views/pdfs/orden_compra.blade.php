@@ -20,7 +20,8 @@
             width: 100%;
             max-width: 1000px;
             margin: 0 auto;
-            padding: 0px;
+            padding: 0px 0px 260px;
+            position: relative;
         }
 
         .header-block {
@@ -41,6 +42,17 @@
         .header-block .title-insub {
             font-size: 12px;
             font-weight: 700;
+        }
+
+        .stamp {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            border: 2px solid #000;
+            padding: 6px 10px;
+            font-size: 18px;
+            font-weight: 700;
+            letter-spacing: 1px;
         }
 
         /* Se mantiene .flex y la estructura de información de cabecera */
@@ -133,6 +145,20 @@
             font-size: 11px;
         }
 
+        .footer {
+            position: fixed;
+            bottom: 20px;
+            left: 20px;
+            right: 20px;
+        }
+
+        .footer .policies {
+            margin-top: 0;
+        }
+
+        .footer .signatures {
+            margin-top: 20px;
+        }
         .clearfix {
             clear: both;
         }
@@ -172,20 +198,17 @@
 
 <body>
     <div class="page">
+        <div class="stamp">{{ $ordenCompra->presupuesto }}</div>
         <div class="header-block">
             <div class="title-main">INMOBILIARIA BUENA RENTA SA</div>
             <div class="title-sub">ORDEN DE COMPRA N.- 0000045</div>
 
             @php
-                $nombre_formato_oc = '';
-                if ($ordenCompra->formato == 'P') {
-                    $nombre_formato_oc = 'PROFORMA';
-                } else if ($ordenCompra->formato == 'F') {
-                    $nombre_formato_oc = 'FACTURA';
-                } 
+                $nombre_formato_oc = $ordenCompra->formato == 'P' ? 'Proforma' : 'Factura';
+                $numero_formato_oc = $ordenCompra->numero_factura_proforma ?? '';
             @endphp
 
-            <div class="title-insub">FORMATO: {{ $nombre_formato_oc }}</div>
+            <div class="title-insub">{{ $nombre_formato_oc }} N.° {{ $numero_formato_oc }}</div>
         </div>
 
         <div class="row">
@@ -275,7 +298,7 @@
                         </tr>
                         <tr>
                             <th style="width:50%" class="left">Presupuesto</th>
-                            <td style="width:50%">PB</td>
+                            <td style="width:50%">{{ $ordenCompra->presupuesto }}</td>
                         </tr>
                         <tr>
                             <th style="width:50%" class="left">Pedidos Compra Afectados</th>
@@ -334,7 +357,7 @@
         </div>
 
 
-        <div class="policies-container">
+        <div class="footer">
             <div class="policies">
                 <b>POLÍTICAS PARA LA ORDEN DE COMPRA:</b><br>
                 A) Este documento es válido solamente si está firmado por la persona autorizada para aprobar
@@ -355,10 +378,8 @@
                 afectacion por
                 la no recepcion de la mercaderia en la fecha acordada<br>
             </div>
-        </div>
 
-        <div class="policies-container">
-            <div class="policies">
+            <div class="signatures">
                 <br>
                 <br>
                 <br>
