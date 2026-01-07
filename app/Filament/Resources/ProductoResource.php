@@ -613,6 +613,7 @@ class ProductoResource extends Resource
                         ->visible(fn() => auth()->user()->can('Borrar')),
                 ]),
             ]
+            );
     }
 
     public static function getRelations(): array

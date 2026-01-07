@@ -660,6 +660,7 @@ class ProveedorResource extends Resource
                 Tables\Actions\DeleteBulkAction::make()
                     ->visible(fn() => auth()->user()->can('Borrar')),
             ]
+            );
     }
 
     public static function getRelations(): array
