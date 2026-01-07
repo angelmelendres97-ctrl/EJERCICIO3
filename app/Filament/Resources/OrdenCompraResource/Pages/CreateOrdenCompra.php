@@ -5,6 +5,7 @@ namespace App\Filament\Resources\OrdenCompraResource\Pages;
 use App\Filament\Resources\OrdenCompraResource;
 use App\Services\OrdenCompraSyncService;
 use Filament\Resources\Pages\CreateRecord;
+use Filament\Actions\Action;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
@@ -16,7 +17,17 @@ class CreateOrdenCompra extends CreateRecord
 
     protected function getRedirectUrl(): string
     {
+        if ($this->record) {
+            return route('orden-compra.pdf', $this->record);
+        }
+
         return $this->getResource()::getUrl('index');
+    }
+
+    protected function getCreateFormAction(): Action
+    {
+        return parent::getCreateFormAction()
+            ->label('Crear e Imprimir');
     }
 
     protected function getListeners(): array

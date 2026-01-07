@@ -15,6 +15,11 @@ use Illuminate\Support\Facades\DB;
 use Filament\Forms\Get;
 use Filament\Forms\Set;
 use App\Filament\Resources\ProveedorResource;
+use App\Filament\Resources\ProductoResource;
+use App\Models\Proveedores;
+use App\Models\Producto;
+use App\Services\ProveedorSyncService;
+use App\Services\ProductoSyncService;
 
 use Filament\Forms\Components\Placeholder;
 use Filament\Forms\Components\Section;
@@ -25,6 +30,7 @@ use Filament\Forms\Components\Actions;
 use Filament\Forms\Components\View;
 use Filament\Actions\StaticAction;
 use Illuminate\Database\Eloquent\Model; // ESTA LÍNEA ES NECESARIA
+use Filament\Notifications\Notification;
 
 class OrdenCompraResource extends Resource
 {
@@ -138,8 +144,10 @@ class OrdenCompraResource extends Resource
                                 $id_empresa = $get('id_empresa');
                                 $amdg_id_empresa = $get('amdg_id_empresa');
                                 $amdg_id_sucursal = $get('amdg_id_sucursal');
-                                return view('livewire.buscar-pedidos-compra-container', compact('id_empresa', 'amdg_id_empresa', 'amdg_id_sucursal'));
+                                $pedidos_importados = $get('pedidos_importados');
+                                return view('livewire.buscar-pedidos-compra-container', compact('id_empresa', 'amdg_id_empresa', 'amdg_id_sucursal', 'pedidos_importados'));
                             })
+                            ->modalId('filtrar-pedidos')
                             ->modalHeading('Buscar Pedidos de Compra para Importar')
                             ->modalSubmitAction(false)
                             ->modalCancelAction(false)
@@ -224,8 +232,51 @@ class OrdenCompraResource extends Resource
                                     ->label('+')
                                     ->tooltip('Crear proveedor')
                                     ->icon('heroicon-o-plus')
-                                    ->url(fn() => ProveedorResource::getUrl('create'))
-                                    ->openUrlInNewTab()
+                                    ->modalHeading('Registrar proveedor')
+                                    ->modalWidth('7xl')
+                                    ->fillForm(fn(Get $get) => [
+                                        'id_empresa' => $get('id_empresa'),
+                                        'admg_id_empresa' => $get('amdg_id_empresa'),
+                                        'admg_id_sucursal' => $get('amdg_id_sucursal'),
+                                    ])
+                                    ->form(ProveedorResource::getFormSchema())
+                                    ->action(function (array $data, Set $set, Get $get) {
+                                        $record = DB::transaction(function () use ($data) {
+                                            $record = Proveedores::create($data);
+                                            $lineasNegocioIds = $data['lineasNegocio'] ?? [];
+                                            $record->lineasNegocio()->attach($lineasNegocioIds);
+                                            ProveedorSyncService::sincronizar($record, $data);
+
+                                            return $record;
+                                        });
+
+                                        $empresaId = $get('id_empresa');
+                                        $amdgIdEmpresa = $get('amdg_id_empresa');
+                                        if ($empresaId && $amdgIdEmpresa) {
+                                            $connectionName = self::getExternalConnectionName($empresaId);
+                                            if ($connectionName) {
+                                                $proveedor = DB::connection($connectionName)
+                                                    ->table('saeclpv')
+                                                    ->where('clpv_cod_empr', $amdgIdEmpresa)
+                                                    ->where('clpv_ruc_clpv', $data['ruc'])
+                                                    ->where('clpv_clopv_clpv', 'PV')
+                                                    ->orderByDesc('clpv_cod_clpv')
+                                                    ->first();
+
+                                                if ($proveedor) {
+                                                    $set('info_proveedor', $proveedor->clpv_cod_clpv);
+                                                    $set('identificacion', $proveedor->clpv_ruc_clpv);
+                                                    $set('id_proveedor', $proveedor->clpv_cod_clpv);
+                                                    $set('proveedor', $proveedor->clpv_nom_clpv);
+                                                }
+                                            }
+                                        }
+
+                                        Notification::make()
+                                            ->title('Proveedor registrado correctamente')
+                                            ->success()
+                                            ->send();
+                                    })
                             )
                             ->afterStateUpdated(function (Set $set, Get $get, ?string $state) {
                                 if (empty($state)) {
@@ -279,6 +330,32 @@ class OrdenCompraResource extends Resource
                     ])->columns(4),
 
                 Forms\Components\Section::make('Productos')
+                    ->headerActions([
+                        Action::make('registrar_producto')
+                            ->label('+ Registrar nuevo producto')
+                            ->icon('heroicon-o-plus')
+                            ->modalHeading('Registrar producto')
+                            ->modalWidth('7xl')
+                            ->fillForm(fn(Get $get) => [
+                                'id_empresa' => $get('id_empresa'),
+                                'amdg_id_empresa' => $get('amdg_id_empresa'),
+                                'amdg_id_sucursal' => $get('amdg_id_sucursal'),
+                            ])
+                            ->form(ProductoResource::getFormSchema())
+                            ->action(function (array $data) {
+                                DB::transaction(function () use ($data) {
+                                    $record = Producto::create($data);
+                                    $lineasNegocioIds = $data['lineasNegocio'] ?? [];
+                                    $record->lineasNegocio()->attach($lineasNegocioIds);
+                                    ProductoSyncService::sincronizar($record, $data);
+                                });
+
+                                Notification::make()
+                                    ->title('Producto registrado correctamente')
+                                    ->success()
+                                    ->send();
+                            }),
+                    ])
 
                     ->schema([
                         Forms\Components\Repeater::make('detalles')
@@ -469,12 +546,6 @@ class OrdenCompraResource extends Resource
                                     ]),
 
                                 Grid::make()->columns(2)->extraAttributes(['class' => 'flex justify-end gap-4'])
-                                    ->hidden(function (Get $get) {
-                                        $baseIva0 = collect($get('detalles'))->where('impuesto', '0')->reduce(function ($carry, $item) {
-                                            return $carry + (floatval($item['cantidad']) * floatval($item['costo']));
-                                        }, 0);
-                                        return $baseIva0 <= 0;
-                                    })
                                     ->schema([
                                         Placeholder::make('lbl_base_iva0')
                                             ->content('Subtotal IVA 0%')
@@ -492,30 +563,20 @@ class OrdenCompraResource extends Resource
                                     ]),
 
                                 Grid::make()->columns(2)->extraAttributes(['class' => 'flex justify-end gap-4'])
-                                    ->hidden(function (Get $get) {
-                                        $baseIva0 = collect($get('detalles'))->where('impuesto', '0')->reduce(function ($carry, $item) {
-                                            return $carry + (floatval($item['cantidad']) * floatval($item['costo']));
-                                        }, 0);
-                                        return $baseIva0 <= 0;
-                                    })
                                     ->schema([
                                         Placeholder::make('lbl_iva0')
                                             ->content('IVA 0%')
                                             ->extraAttributes(['class' => 'text-right font-semibold'])
                                             ->hiddenLabel(),
                                         Placeholder::make('val_iva0')
-                                            ->content('$0.00')
+                                            ->content(function () {
+                                                return '$' . number_format(0, 2, '.', '');
+                                            })
                                             ->extraAttributes(['class' => 'text-right font-bold w-32'])
                                             ->hiddenLabel(),
                                     ]),
 
                                 Grid::make()->columns(2)->extraAttributes(['class' => 'flex justify-end gap-4'])
-                                    ->hidden(function (Get $get) {
-                                        $baseIva5 = collect($get('detalles'))->where('impuesto', '5')->reduce(function ($carry, $item) {
-                                            return $carry + (floatval($item['cantidad']) * floatval($item['costo']));
-                                        }, 0);
-                                        return $baseIva5 <= 0;
-                                    })
                                     ->schema([
                                         Placeholder::make('lbl_base_iva5')
                                             ->content('Subtotal IVA 5%')
@@ -533,12 +594,6 @@ class OrdenCompraResource extends Resource
                                     ]),
 
                                 Grid::make()->columns(2)->extraAttributes(['class' => 'flex justify-end gap-4'])
-                                    ->hidden(function (Get $get) {
-                                        $totalIva = collect($get('detalles'))->where('impuesto', '5')->reduce(function ($carry, $item) {
-                                            return $carry + (floatval($item['cantidad']) * floatval($item['costo']) * 0.05);
-                                        }, 0);
-                                        return $totalIva <= 0;
-                                    })
                                     ->schema([
                                         Placeholder::make('lbl_iva5')
                                             ->content('IVA 5%')
@@ -556,12 +611,6 @@ class OrdenCompraResource extends Resource
                                     ]),
 
                                 Grid::make()->columns(2)->extraAttributes(['class' => 'flex justify-end gap-4'])
-                                    ->hidden(function (Get $get) {
-                                        $baseIva15 = collect($get('detalles'))->where('impuesto', '15')->reduce(function ($carry, $item) {
-                                            return $carry + (floatval($item['cantidad']) * floatval($item['costo']));
-                                        }, 0);
-                                        return $baseIva15 <= 0;
-                                    })
                                     ->schema([
                                         Placeholder::make('lbl_base_iva15')
                                             ->content('Subtotal IVA 15%')
@@ -579,12 +628,6 @@ class OrdenCompraResource extends Resource
                                     ]),
 
                                 Grid::make()->columns(2)->extraAttributes(['class' => 'flex justify-end gap-4'])
-                                    ->hidden(function (Get $get) {
-                                        $totalIva15 = collect($get('detalles'))->where('impuesto', '15')->reduce(function ($carry, $item) {
-                                            return $carry + (floatval($item['cantidad']) * floatval($item['costo']) * 0.15);
-                                        }, 0);
-                                        return $totalIva15 <= 0;
-                                    })
                                     ->schema([
                                         Placeholder::make('lbl_iva15')
                                             ->content('IVA 15%')
@@ -602,12 +645,6 @@ class OrdenCompraResource extends Resource
                                     ]),
 
                                 Grid::make()->columns(2)->extraAttributes(['class' => 'flex justify-end gap-4'])
-                                    ->hidden(function (Get $get) {
-                                        $baseIva18 = collect($get('detalles'))->where('impuesto', '18')->reduce(function ($carry, $item) {
-                                            return $carry + (floatval($item['cantidad']) * floatval($item['costo']));
-                                        }, 0);
-                                        return $baseIva18 <= 0;
-                                    })
                                     ->schema([
                                         Placeholder::make('lbl_base_iva18')
                                             ->content('Subtotal IVA 18%')
@@ -625,12 +662,6 @@ class OrdenCompraResource extends Resource
                                     ]),
 
                                 Grid::make()->columns(2)->extraAttributes(['class' => 'flex justify-end gap-4'])
-                                    ->hidden(function (Get $get) {
-                                        $totalIva18 = collect($get('detalles'))->where('impuesto', '18')->reduce(function ($carry, $item) {
-                                            return $carry + (floatval($item['cantidad']) * floatval($item['costo']) * 0.18);
-                                        }, 0);
-                                        return $totalIva18 <= 0;
-                                    })
                                     ->schema([
                                         Placeholder::make('lbl_iva18')
                                             ->content('IVA 18%')

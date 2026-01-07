@@ -70,8 +70,12 @@ class ProductoResource extends Resource
 
     public static function form(Form $form): Form
     {
-        return $form
-            ->schema([
+        return $form->schema(self::getFormSchema());
+    }
+
+    public static function getFormSchema(): array
+    {
+        return [
                 Forms\Components\Section::make('Conexion e informacion principal')
                     ->schema([
                         Forms\Components\Select::make('id_empresa')
@@ -530,7 +534,7 @@ class ProductoResource extends Resource
                             })
                             ->columns(2)
                     ])->columns(1),
-            ]);
+        ];
     }
 
     public static function table(Table $table): Table
@@ -608,7 +612,7 @@ class ProductoResource extends Resource
                     Tables\Actions\DeleteBulkAction::make()
                         ->visible(fn() => auth()->user()->can('Borrar')),
                 ]),
-            ]);
+            ]
     }
 
     public static function getRelations(): array

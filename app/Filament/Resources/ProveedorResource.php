@@ -56,7 +56,12 @@ class ProveedorResource extends Resource
 
     public static function form(Form $form): Form
     {
-        return $form->schema([
+        return $form->schema(self::getFormSchema());
+    }
+
+    public static function getFormSchema(): array
+    {
+        return [
             Forms\Components\Section::make('Información General')
                 ->schema([
                     Forms\Components\Select::make('id_empresa')
@@ -553,7 +558,7 @@ class ProveedorResource extends Resource
                         })
                         ->columns(2)
                 ])->columns(1),
-        ]);
+        ];
     }
 
     public static function table(Table $table): Table
@@ -654,7 +659,7 @@ class ProveedorResource extends Resource
             ->bulkActions([
                 Tables\Actions\DeleteBulkAction::make()
                     ->visible(fn() => auth()->user()->can('Borrar')),
-            ]);
+            ]
     }
 
     public static function getRelations(): array
