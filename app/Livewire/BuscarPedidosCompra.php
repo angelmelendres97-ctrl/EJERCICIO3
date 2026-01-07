@@ -221,6 +221,20 @@ class BuscarPedidosCompra extends Component implements HasForms, HasTable
                             $motivo
                         );
 
+                        $pedidosActuales = $this->parsePedidosImportados($this->pedidos_importados);
+                        $pedidosSeleccionados = $records->pluck('pedi_cod_pedi')
+                            ->map(fn($pedido) => (int) ltrim((string) $pedido, '0'))
+                            ->filter(fn($pedido) => $pedido > 0)
+                            ->all();
+
+                        $pedidosUnicos = array_values(array_unique(array_merge($pedidosActuales, $pedidosSeleccionados)));
+                        $this->pedidos_importados = implode(', ', array_map(
+                            fn($pedido) => str_pad($pedido, 8, "0", STR_PAD_LEFT),
+                            $pedidosUnicos
+                        ));
+
+                        $this->resetTable();
+
                         // 🔥 CERRAR MODAL 100% SEGURO
                         $action->cancel();
                         $this->dispatch('close-modal', id: 'filtrar-pedidos');
