@@ -422,6 +422,15 @@ class OrdenCompraResource extends Resource
                             ->schema([
                                 Grid::make(14)
                                     ->schema([
+                                        Forms\Components\Hidden::make('es_auxiliar'),
+
+                                        Forms\Components\TextInput::make('producto_auxiliar')
+                                            ->label('Producto auxiliar')
+                                            ->disabled()
+                                            ->dehydrated(false)
+                                            ->visible(fn(Get $get) => (bool) $get('es_auxiliar'))
+                                            ->columnSpan(['default' => 12, 'lg' => 14]),
+
                                         Forms\Components\Select::make('id_bodega')
                                             ->label('Bodega')
                                             ->placeholder('Seleccione')
@@ -496,6 +505,9 @@ class OrdenCompraResource extends Resource
                                             ->searchable()
                                             ->live()
                                             ->required()
+                                            ->helperText(fn(Get $get) => (bool) $get('es_auxiliar')
+                                                ? 'Seleccione un producto real del inventario para reemplazar el auxiliar.'
+                                                : null)
                                             ->columnSpan(['default' => 12, 'lg' => 3])
                                             ->afterStateUpdated(function (Set $set, Get $get, ?string $state) {
                                                 if (empty($state)) {
