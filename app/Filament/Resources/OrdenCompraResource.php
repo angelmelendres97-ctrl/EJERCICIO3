@@ -422,6 +422,12 @@ class OrdenCompraResource extends Resource
                             ->schema([
                                 Grid::make(14)
                                     ->schema([
+                                        Forms\Components\Placeholder::make('detalle_auxiliar')
+                                            ->label('Producto auxiliar')
+                                            ->content(fn(Get $get) => $get('detalle'))
+                                            ->visible(fn(Get $get) => filled($get('detalle')))
+                                            ->columnSpan(['default' => 12, 'lg' => 14]),
+
                                         Forms\Components\Select::make('id_bodega')
                                             ->label('Bodega')
                                             ->placeholder('Seleccione')
@@ -459,6 +465,7 @@ class OrdenCompraResource extends Resource
 
                                         Forms\Components\Select::make('codigo_producto')
                                             ->label('Producto')
+                                            ->helperText(fn(Get $get) => filled($get('detalle')) ? 'Producto auxiliar. Debe seleccionar un producto real del inventario.' : null)
                                             ->options(function (Get $get) {
                                                 $empresaId = $get('../../id_empresa');
                                                 $amdg_id_empresa = $get('../../amdg_id_empresa');
@@ -537,6 +544,7 @@ class OrdenCompraResource extends Resource
                                             }),
 
                                         Forms\Components\Hidden::make('producto'),
+                                        Forms\Components\Hidden::make('detalle'),
 
                                         Forms\Components\TextInput::make('cantidad')
                                             ->numeric()

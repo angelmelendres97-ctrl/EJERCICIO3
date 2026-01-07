@@ -27,6 +27,10 @@ class BuscarPedidosCompra extends Component implements HasForms, HasTable
     use InteractsWithForms;
     use InteractsWithTable;
 
+    protected $listeners = [
+        'pedidos_importados_actualizados' => 'onPedidosImportadosActualizados',
+    ];
+
     public $id_empresa;
     public $amdg_id_empresa;
     public $amdg_id_sucursal;
@@ -261,5 +265,11 @@ class BuscarPedidosCompra extends Component implements HasForms, HasTable
     public function render()
     {
         return view('livewire.buscar-pedidos-compra');
+    }
+
+    public function onPedidosImportadosActualizados(?string $pedidosImportados): void
+    {
+        $this->pedidos_importados = $pedidosImportados;
+        $this->resetTable();
     }
 }
