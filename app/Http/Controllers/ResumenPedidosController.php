@@ -21,23 +21,25 @@ class ResumenPedidosController extends Controller
         // Load necessary relationships to avoid N+1 problems.
         $resumenPedidos->load('detalles', 'empresa', 'usuario');
 
-        $nombreEmpresaTitulo = $resumenPedidos->empresa->nombre_empresa ?? 'Nombre de Empresa no disponible';
-        if ($resumenPedidos->tipo === 'AZ') {
-            $connectionName = ResumenPedidosResource::getExternalConnectionName((int) $resumenPedidos->id_empresa);
-            if ($connectionName) {
-                try {
-                    $empresaNombre = DB::connection($connectionName)
-                        ->table('saeempr')
-                        ->where('empr_cod_empr', $resumenPedidos->amdg_id_empresa)
-                        ->value('empr_nom_empr');
-                } catch (\Exception $e) {
-                    $empresaNombre = null;
-                }
-
-                if ($empresaNombre) {
-                    $nombreEmpresaTitulo = $empresaNombre;
-                }
+        $nombreEmpresaConexion = $resumenPedidos->empresa->nombre_empresa ?? null;
+        $nombreEmpresaTitulo = $nombreEmpresaConexion ?? 'Nombre de Empresa no disponible';
+        $nombreEmpresaRazonSocial = null;
+        $connectionName = ResumenPedidosResource::getExternalConnectionName((int) $resumenPedidos->id_empresa);
+        if ($connectionName) {
+            try {
+                $nombreEmpresaRazonSocial = DB::connection($connectionName)
+                    ->table('saeempr')
+                    ->where('empr_cod_empr', $resumenPedidos->amdg_id_empresa)
+                    ->value('empr_nom_empr');
+            } catch (\Exception $e) {
+                $nombreEmpresaRazonSocial = null;
             }
+        }
+
+        if ($resumenPedidos->tipo === 'PB' && $nombreEmpresaRazonSocial) {
+            $nombreEmpresaTitulo = $nombreEmpresaRazonSocial;
+        } elseif (!$nombreEmpresaConexion && $nombreEmpresaRazonSocial) {
+            $nombreEmpresaTitulo = $nombreEmpresaRazonSocial;
         }
 
         // The view 'pdfs.resumen_pedidos' will be created.
