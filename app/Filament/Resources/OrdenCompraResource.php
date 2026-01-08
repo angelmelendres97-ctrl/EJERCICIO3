@@ -587,13 +587,24 @@ class OrdenCompraResource extends Resource
                                             ->prefix('$')
                                             ->columnSpan(['default' => 12, 'lg' => 2]),
 
+                                        Forms\Components\Placeholder::make('subtotal_linea')
+                                            ->label('Subtotal')
+                                            ->content(function (Get $get) {
+                                                $cantidad = floatval($get('cantidad'));
+                                                $costo = floatval($get('costo'));
+                                                $subtotal = $cantidad * $costo;
+
+                                                return '$' . number_format($subtotal, 4, '.', '');
+                                            })
+                                            ->columnSpan(['default' => 12, 'lg' => 1]),
+
                                         Forms\Components\Select::make('impuesto')
-                                            ->options(['0' => '0%', '5' => '5%', '15' => '15%', '18' => '18%'])
+                                            ->options(['0' => '0%', '5' => '5%', '8' => '8%', '15' => '15%', '18' => '18%'])
                                             ->required()
                                             ->live()
                                             ->columnSpan(['default' => 12, 'lg' => 1]),
 
-                                        Forms\Components\Placeholder::make('valor_iva')
+                                        /*    Forms\Components\Placeholder::make('valor_iva')
                                             ->label('IVA')
                                             ->content(function (Get $get) {
                                                 $cantidad = floatval($get('cantidad'));
@@ -602,7 +613,13 @@ class OrdenCompraResource extends Resource
                                                 $valorIva = ($cantidad * $costo) * ($iva / 100);
                                                 return '$' . number_format($valorIva, 4, '.', '');
                                             })
-                                            ->columnSpan(['default' => 12, 'lg' => 1]),
+                                            ->columnSpan(['default' => 12, 'lg' => 1]), */
+
+
+
+
+
+
 
                                         Forms\Components\Placeholder::make('total_linea')
                                             ->label('Total Item')
@@ -793,6 +810,58 @@ class OrdenCompraResource extends Resource
 
                                 Grid::make()->columns(2)->extraAttributes(['class' => 'flex justify-end gap-4'])
                                     ->schema([
+                                        Placeholder::make('lbl_base_iva8')
+                                            ->content('Subtotal IVA 8%')
+                                            ->extraAttributes(['class' => 'text-right font-semibold'])
+                                            ->hiddenLabel(),
+                                        Placeholder::make('val_base_iva8')
+                                            ->content(function (Get $get) {
+                                                $baseIva8 = collect($get('detalles'))->where('impuesto', '8')->reduce(function ($carry, $item) {
+                                                    return $carry + (floatval($item['cantidad']) * floatval($item['costo']));
+                                                }, 0);
+
+                                                return '$' . number_format($baseIva8, 2, '.', '');
+                                            })
+                                            ->extraAttributes(['class' => 'text-right font-bold w-32'])
+                                            ->hiddenLabel(),
+                                    ])
+                                    ->visible(function (Get $get) {
+                                        $totalIva8 = collect($get('detalles'))->where('impuesto', '8')->reduce(function ($carry, $item) {
+                                            return $carry + (floatval($item['cantidad']) * floatval($item['costo']) * 0.08);
+                                        }, 0);
+
+                                        return $totalIva8 > 0;
+                                    }),
+
+                                Grid::make()->columns(2)->extraAttributes(['class' => 'flex justify-end gap-4'])
+                                    ->schema([
+                                        Placeholder::make('lbl_iva8')
+                                            ->content('IVA 8%')
+                                            ->extraAttributes(['class' => 'text-right font-semibold'])
+                                            ->hiddenLabel(),
+                                        Placeholder::make('val_iva8')
+                                            ->content(function (Get $get) {
+                                                $totalIva8 = collect($get('detalles'))->where('impuesto', '8')->reduce(function ($carry, $item) {
+                                                    return $carry + (floatval($item['cantidad']) * floatval($item['costo']) * 0.08);
+                                                }, 0);
+
+                                                return '$' . number_format($totalIva8, 2, '.', '');
+                                            })
+                                            ->extraAttributes(['class' => 'text-right font-bold w-32'])
+                                            ->hiddenLabel(),
+                                    ])
+                                    ->visible(function (Get $get) {
+                                        $totalIva8 = collect($get('detalles'))->where('impuesto', '8')->reduce(function ($carry, $item) {
+                                            return $carry + (floatval($item['cantidad']) * floatval($item['costo']) * 0.08);
+                                        }, 0);
+
+                                        return $totalIva8 > 0;
+                                    }),
+
+
+
+                                Grid::make()->columns(2)->extraAttributes(['class' => 'flex justify-end gap-4'])
+                                    ->schema([
                                         Placeholder::make('lbl_base_iva15')
                                             ->content('Subtotal IVA 15%')
                                             ->extraAttributes(['class' => 'text-right font-semibold'])
@@ -947,6 +1016,12 @@ class OrdenCompraResource extends Resource
                     ->label('Conexión')
                     ->sortable(),
 
+                Tables\Columns\TextColumn::make('numero_factura_proforma')
+                    ->label('N° Fact/Proforma')
+                    ->searchable()
+                    ->sortable()
+                    ->toggleable(),
+
                 Tables\Columns\TextColumn::make('amdg_id_empresa')
                     ->label('Empresa')
                     ->sortable()
@@ -1040,12 +1115,12 @@ class OrdenCompraResource extends Resource
 
                 Tables\Columns\TextColumn::make('uso_compra')
                     ->label('Uso Compra')
-                    ->toggleable(isToggledHiddenByDefault: true)
+                    ->toggleable()
                     ->sortable(),
 
                 Tables\Columns\TextColumn::make('solicitado_por')
                     ->label('Solicitado Por')
-                    ->toggleable(isToggledHiddenByDefault: true)
+                    ->toggleable()
                     ->sortable(),
 
                 Tables\Columns\TextColumn::make('formato')

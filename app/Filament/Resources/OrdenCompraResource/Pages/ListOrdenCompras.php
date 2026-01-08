@@ -24,10 +24,10 @@ class ListOrdenCompras extends ListRecords
         ];
     }
 
-    protected function getFooterWidgets(): array
+   /*  protected function getFooterWidgets(): array
     {
         return [
             ResumenPedidosTableWidget::class,
         ];
-    }
+    } */
 }

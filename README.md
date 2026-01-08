@@ -70,3 +70,7 @@ php artisan migrate:rollback --path=/database/migrations/2025_11_17_193400_creat
 
 php artisan migrate --path=/database/migrations/2025_12_11_130932_create_resumen_pedidos_table.php
 php artisan migrate --path=/database/migrations/2025_12_11_132648_create_detalle_resumen_pedidos_table.php
+
+
+ php artisan migrate --path=database/migrations/2025_12_11_130932_create_resumen_pedidos_table.php
+ php artisan migrate --path=database/migrations/2025_12_11_132648_create_detalle_resumen_pedidos_table.php
