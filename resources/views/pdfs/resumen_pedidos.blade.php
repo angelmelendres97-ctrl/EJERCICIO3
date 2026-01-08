@@ -247,7 +247,7 @@
             </div>
 
             <div class="doc-line">
-                <span class="doc-number">N° {{ str_pad($resumen->codigo_secuencial, 8, '0', STR_PAD_LEFT) }}</span>
+                <span class="doc-number">O.C. N° {{ str_pad($resumen->codigo_secuencial, 8, '0', STR_PAD_LEFT) }}</span>
                 <span class="doc-type"> {{ $resumen->tipo }}</span>
             </div>
         </div>
