@@ -243,7 +243,7 @@
 
         <div class="header-block">
             <div class="company-name">
-                {{ $resumen->empresa->nombre_empresa ?? 'Nombre de Empresa no disponible' }}
+                {{ $nombreEmpresaPdf ?? ($resumen->empresa->nombre_empresa ?? 'Nombre de Empresa no disponible') }}
             </div>
 
             <div class="doc-line">
