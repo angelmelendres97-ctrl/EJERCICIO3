@@ -1051,8 +1051,17 @@ class OrdenCompraResource extends Resource
                             return 'Error DB';
                         }
                     })
-                    ->toggleable(isToggledHiddenByDefault: true),
-
+                    ->toggleable(),
+                Tables\Columns\TextColumn::make('presupuesto')
+                    ->label('Presupuesto')
+                    ->badge()
+                    ->color(fn(string $state): string => match ($state) {
+                        'PB' => 'warning',
+                        'AZ' => 'success',
+                        default => 'gray',
+                    })
+                    ->toggleable(isToggledHiddenByDefault: true)
+                    ->sortable(),
                 Tables\Columns\TextColumn::make('amdg_id_sucursal')
                     ->label('Sucursal')
                     ->sortable()
@@ -1094,7 +1103,7 @@ class OrdenCompraResource extends Resource
                     ->sortable(),
 
                 Tables\Columns\TextColumn::make('usuario.name')
-                    ->label('Usuario')
+                    ->label('Creado Por')
                     ->sortable()
                     ->toggleable(),
 
@@ -1161,16 +1170,7 @@ class OrdenCompraResource extends Resource
                     ->toggleable(isToggledHiddenByDefault: true)
                     ->sortable(),
 
-                Tables\Columns\TextColumn::make('presupuesto')
-                    ->label('Formato')
-                    ->badge()
-                    ->color(fn(string $state): string => match ($state) {
-                        'PB' => 'warning',
-                        'AZ' => 'success',
-                        default => 'gray',
-                    })
-                    ->toggleable(isToggledHiddenByDefault: true)
-                    ->sortable(),
+
 
                 Tables\Columns\TextColumn::make('observaciones')
                     ->toggleable(isToggledHiddenByDefault: true),

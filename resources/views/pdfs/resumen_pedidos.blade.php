@@ -40,7 +40,7 @@
 
         .company-name {
             font-size: 32px;
-            /* súbelo a 34/36 si quieres más */
+            /* sï¿½belo a 34/36 si quieres mï¿½s */
             font-weight: 800;
             line-height: 1.05;
             margin-bottom: 6px;
@@ -56,11 +56,11 @@
             display: flex;
             justify-content: center;
             align-items: baseline;
-            /* alinea bien números/letras grandes */
+            /* alinea bien nï¿½meros/letras grandes */
             gap: 18px;
         }
 
-        /* Número */
+        /* Nï¿½mero */
         .doc-number {
             font-size: 28px;
             font-weight: 800;
@@ -70,7 +70,7 @@
         /* Presupuesto (AZ / PB) */
         .doc-type {
             font-size: 40px;
-            /* mismo tamaño que el número */
+            /* mismo tamaï¿½o que el nï¿½mero */
             font-weight: 1000;
             letter-spacing: 0.5px;
             text-transform: uppercase;
@@ -178,31 +178,31 @@
         }
 
         /* FOOTER (USANDO ELEMENTO FIJO + CONTADORES) */
-        /* Este método funciona en dompdf, mpdf y wkhtmltopdf */
+        /* Este mï¿½todo funciona en dompdf, mpdf y wkhtmltopdf */
         .pdf-footer {
             position: fixed;
             bottom: 10px;
-            /* distancia desde la parte inferior de la página */
+            /* distancia desde la parte inferior de la pï¿½gina */
             right: 20px;
-            /* alineado a la derecha (cámbialo si quieres centrar) */
+            /* alineado a la derecha (cï¿½mbialo si quieres centrar) */
             font-size: 12px;
             font-family: Arial, Helvetica, sans-serif;
         }
 
         /* El contenido se genera con :before usando los contadores */
         .pdf-footer .pagenum:before {
-            content: "Pág " counter(page) " / " counter(pages);
+            content: "Pï¿½g " counter(page) " / " counter(pages);
         }
 
-        /* Si el motor no soporta counter(pages) mostrará solo el número de página */
+        /* Si el motor no soporta counter(pages) mostrarï¿½ solo el nï¿½mero de pï¿½gina */
         .pdf-footer .pagenum-alt:before {
-            content: "Pág " counter(page);
+            content: "Pï¿½g " counter(page);
         }
 
         .signatures-fixed {
             position: fixed;
             bottom: 45px;
-            /* deja espacio para el footer de páginas */
+            /* deja espacio para el footer de pï¿½ginas */
             left: 20px;
             right: 20px;
         }
@@ -212,7 +212,7 @@
         }
 
 
-        /* Línea número + presupuesto */
+        /* Lï¿½nea nï¿½mero + presupuesto */
         .doc-line {
             display: flex;
             justify-content: center;
@@ -220,7 +220,7 @@
             align-items: center;
             /* centra verticalmente */
             gap: 12px;
-            /* espacio entre número y PB */
+            /* espacio entre nï¿½mero y PB */
         }
 
 
@@ -247,7 +247,7 @@
             </div>
 
             <div class="doc-line">
-                <span class="doc-number">N° {{ str_pad($resumen->id, 8, '0', STR_PAD_LEFT) }}</span>
+                <span class="doc-number">NÂ° {{ str_pad($resumen->codigo_secuencial, 8, '0', STR_PAD_LEFT) }}</span>
                 <span class="doc-type"> {{ $resumen->tipo }}</span>
             </div>
         </div>
@@ -348,7 +348,7 @@
 
                     <td class="sign-cell">
                         <div class="sign-line"></div>
-                        <div class="sign-label"><b>RESIBIDO</b></div>
+                        <div class="sign-label"><b>RECIBIDO</b></div>
                     </td>
 
 
@@ -358,11 +358,11 @@
 
     </div>
 
-    <!-- FOOTER FIJO que se repetirá en cada página -->
+    <!-- FOOTER FIJO que se repetirï¿½ en cada pï¿½gina -->
     <div class="pdf-footer" aria-hidden="true">
-        <!-- Si su generador soporta counter(pages) se mostrará "Pág X / Y" -->
+        <!-- Si su generador soporta counter(pages) se mostrarï¿½ "Pï¿½g X / Y" -->
         <span class="pagenum"></span>
-        <!-- Si no, puede usar la alternativa (solo número de página) -->
+        <!-- Si no, puede usar la alternativa (solo nï¿½mero de pï¿½gina) -->
         <span style="display:none" class="pagenum-alt"></span>
     </div>
 
