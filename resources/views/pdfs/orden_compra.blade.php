@@ -267,7 +267,7 @@
         <div class="stamp">{{ $ordenCompra->presupuesto }}</div>
 
         <div class="header-block">
-            <div class="title-main">{{ $ordenCompra->empresa->nombre_empresa }}</div>
+            <div class="title-main">{{ $nombreEmpresaTitulo ?? 'Nombre de Empresa no disponible' }}</div>
             <div class="title-sub">ORDEN DE COMPRA N° {{ str_pad($ordenCompra->id, 8, '0', STR_PAD_LEFT) }}</div>
 
             @php
