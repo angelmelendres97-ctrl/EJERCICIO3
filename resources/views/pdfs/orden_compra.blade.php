@@ -22,7 +22,7 @@
             width: 100%;
             max-width: 1000px;
             margin: 0 auto;
-            /* Deja espacio para el footer fijo (políticas + firmas) */
+            /* Deja espacio para el footer fijo (polï¿½ticas + firmas) */
             padding: 0px 0px 260px;
             position: relative;
         }
@@ -92,9 +92,9 @@
             width: 100%;
             border-collapse: collapse;
             margin-top: 25px;
-            /* más espacio arriba */
+            /* mï¿½s espacio arriba */
             margin-bottom: 25px;
-            /* más espacio abajo */
+            /* mï¿½s espacio abajo */
             font-size: 13px;
         }
 
@@ -208,7 +208,7 @@
             font-size: 11px;
         }
 
-        /* Firmas: SIN “marco contenedor” */
+        /* Firmas: SIN ï¿½marco contenedorï¿½ */
         .signatures {
             margin-top: 40px;
         }
@@ -228,7 +228,7 @@
             width: 50%;
             text-align: center;
             padding-top: 55px;
-            /* ? MÁS ESPACIO PARA FIRMAR */
+            /* ? Mï¿½S ESPACIO PARA FIRMAR */
         }
 
         .sign-line {
@@ -268,14 +268,14 @@
 
         <div class="header-block">
             <div class="title-main">{{ $ordenCompra->empresa->nombre_empresa }}</div>
-            <div class="title-sub">ORDEN DE COMPRA N.- {{ str_pad($ordenCompra->id, 8, '0', STR_PAD_LEFT) }}</div>
+            <div class="title-sub">ORDEN DE COMPRA NÂ° {{ str_pad($ordenCompra->id, 8, '0', STR_PAD_LEFT) }}</div>
 
             @php
                 $nombre_formato_oc = $ordenCompra->formato == 'P' ? 'Proforma' : 'Factura';
                 $numero_formato_oc = $ordenCompra->numero_factura_proforma ?? '';
             @endphp
 
-            <div class="title-sub">{{ $nombre_formato_oc }} N.° {{ $numero_formato_oc }}</div>
+            <div class="title-sub">{{ $nombre_formato_oc }} NÂ° {{ $numero_formato_oc }}</div>
         </div>
 
         <!-- CABECERA INFO -->
@@ -311,8 +311,8 @@
             <thead>
                 <tr>
                     <th style="width:20px">#</th>
-                    <th style="width:100px">Código</th>
-                    <th>Descripción</th>
+                    <th style="width:100px">Cï¿½digo</th>
+                    <th>Descripciï¿½n</th>
                     <th style="width:40px">Unid.</th>
                     <th style="width:60px">Cant.</th>
                     <th style="width:60px">Precio U.</th>
@@ -388,13 +388,9 @@
                             </tr>
                         @endif
 
+                      
                         <tr>
-                            <th>Presupuesto</th>
-                            <td>{{ $ordenCompra->presupuesto }}</td>
-                        </tr>
-
-                        <tr>
-                            <th>Pedidos Compra Afectados</th>
+                            <th>Numeros de pedido</th>
                             <td>{{ $txt_pedidos }}</td>
                         </tr>
                     </table>
@@ -431,8 +427,8 @@
                 $empresaNombreUpper = mb_strtoupper($empresaNombre, 'UTF-8');
             @endphp
             <div class="policies">
-                <b>POLÍTICAS PARA LA ORDEN DE COMPRA:</b><br>
-                A) Este documento es válido solamente si está firmado por la persona autorizada para aprobar
+                <b>POLï¿½TICAS PARA LA ORDEN DE COMPRA:</b><br>
+                A) Este documento es vï¿½lido solamente si estï¿½ firmado por la persona autorizada para aprobar
                 compras.<br>
                 B) El proveedor sera responsable de revisar los precios establecidos en la presente orden de compra,
                 esten acorde a los cotizados. Y no podran variar segun el tiempo de vigencia establecido en la
