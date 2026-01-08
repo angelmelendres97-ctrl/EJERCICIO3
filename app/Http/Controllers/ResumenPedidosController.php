@@ -5,8 +5,6 @@ namespace App\Http\Controllers;
 use App\Filament\Resources\ResumenPedidosResource;
 use App\Models\ResumenPedidos;
 use Barryvdh\DomPDF\Facade\Pdf;
-use Illuminate\Support\Facades\DB;
-use Illuminate\Http\Request;
 
 class ResumenPedidosController extends Controller
 {
@@ -22,22 +20,14 @@ class ResumenPedidosController extends Controller
         $resumenPedidos->load('detalles', 'empresa', 'usuario');
 
         $nombreEmpresaTitulo = $resumenPedidos->empresa->nombre_empresa ?? 'Nombre de Empresa no disponible';
-        if ($resumenPedidos->tipo === 'AZ') {
-            $connectionName = ResumenPedidosResource::getExternalConnectionName((int) $resumenPedidos->id_empresa);
-            if ($connectionName) {
-                try {
-                    $empresaNombre = DB::connection($connectionName)
-                        ->table('saeempr')
-                        ->where('empr_cod_empr', $resumenPedidos->amdg_id_empresa)
-                        ->value('empr_nom_empr');
-                } catch (\Exception $e) {
-                    $empresaNombre = null;
-                }
+        $empresaNombre = ResumenPedidosResource::resolveEmpresaNombre(
+            (int) $resumenPedidos->id_empresa,
+            (int) $resumenPedidos->amdg_id_empresa,
+            $resumenPedidos->tipo
+        );
 
-                if ($empresaNombre) {
-                    $nombreEmpresaTitulo = $empresaNombre;
-                }
-            }
+        if ($empresaNombre) {
+            $nombreEmpresaTitulo = $empresaNombre;
         }
 
         // The view 'pdfs.resumen_pedidos' will be created.

@@ -62,6 +62,36 @@ class ResumenPedidosResource extends Resource
         return $connectionName;
     }
 
+    public static function resolveEmpresaNombre(int $empresaId, int $amdgEmpresaId, ?string $tipo): ?string
+    {
+        if (!$empresaId || !$amdgEmpresaId) {
+            return null;
+        }
+
+        $connectionName = self::getExternalConnectionName($empresaId);
+        if (!$connectionName) {
+            return null;
+        }
+
+        try {
+            $empresa = DB::connection($connectionName)
+                ->table('saeempr')
+                ->where('empr_cod_empr', $amdgEmpresaId)
+                ->first();
+        } catch (\Exception $e) {
+            return null;
+        }
+
+        $razonSocial = data_get($empresa, 'empr_raz_soc');
+        $nombreComercial = data_get($empresa, 'empr_nom_empr');
+
+        if ($tipo === 'PB') {
+            return $razonSocial ?: $nombreComercial;
+        }
+
+        return $nombreComercial ?: $razonSocial;
+    }
+
     public static function form(Form $form): Form
     {
         return $form
@@ -228,23 +258,13 @@ class ResumenPedidosResource extends Resource
                             return 'N/A (Faltan IDs)';
                         }
 
-                        $connectionName = self::getExternalConnectionName($empresaId);
+                        $nombreEmpresa = self::resolveEmpresaNombre($empresaId, $amdg_id_empresa, $record->tipo);
 
-                        if (!$connectionName) {
-                            return 'N/A (No hay conexión)';
+                        if (!$nombreEmpresa) {
+                            return 'Empresa no encontrada';
                         }
 
-                        try {
-                            $empresa = DB::connection($connectionName)
-                                ->table('saeempr')
-                                ->where('empr_cod_empr', $amdg_id_empresa)
-                                ->select(DB::raw(" '(' || empr_cod_empr || ') ' || empr_nom_empr AS nombre_empresa"))
-                                ->first();
-
-                            return $empresa->nombre_empresa ?? 'Empresa no encontrada';
-                        } catch (\Exception $e) {
-                            return 'Error DB';
-                        }
+                        return '(' . $amdg_id_empresa . ') ' . $nombreEmpresa;
                     })
                     ->toggleable(),
                      Tables\Columns\TextColumn::make('tipo')
