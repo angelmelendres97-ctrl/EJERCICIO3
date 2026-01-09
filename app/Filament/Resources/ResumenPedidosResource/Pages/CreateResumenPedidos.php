@@ -5,16 +5,23 @@ namespace App\Filament\Resources\ResumenPedidosResource\Pages;
 use App\Filament\Resources\ResumenPedidosResource;
 use App\Models\DetalleResumenPedidos;
 use Filament\Resources\Pages\CreateRecord;
-use Illuminate\Support\Facades\DB;
 use App\Models\ResumenPedidos;
+use Filament\Actions\Action;
 
 class CreateResumenPedidos extends CreateRecord
 {
     protected static string $resource = ResumenPedidosResource::class;
+    protected static string $view = 'filament.resources.resumen-pedidos-resource.pages.create-resumen-pedidos';
 
     protected function getRedirectUrl(): string
     {
         return $this->getResource()::getUrl('index');
+    }
+
+    protected function getCreateFormAction(): Action
+    {
+        return parent::getCreateFormAction()
+            ->label('Crear e Imprimir');
     }
 
     protected function mutateFormDataBeforeCreate(array $data): array
@@ -50,6 +57,10 @@ class CreateResumenPedidos extends CreateRecord
                     'id_orden_compra' => $orden['id_orden_compra'],
                 ]);
             }
+        }
+
+        if ($resumenPedido) {
+            $this->dispatch('open-resumen-pedidos-pdf', url: route('resumen-pedidos.pdf', $resumenPedido));
         }
     }
 }
