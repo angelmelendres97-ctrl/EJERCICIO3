@@ -478,7 +478,7 @@
         <!-- FOOTER FIJO -->
         <div class="footer">
             @php
-                $empresaNombre = $ordenCompra->empresa->nombre_empresa ?? 'LA EMPRESA';
+                $empresaNombre = $nombreEmpresaTitulo ?? ($ordenCompra->empresa->nombre_empresa ?? 'LA EMPRESA');
                 $empresaNombreUpper = mb_strtoupper($empresaNombre, 'UTF-8');
             @endphp
 

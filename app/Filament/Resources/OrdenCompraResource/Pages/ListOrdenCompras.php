@@ -19,7 +19,7 @@ class ListOrdenCompras extends ListRecords
             Actions\Action::make('crear_resumen')
                 ->label('Crear resumen')
                 ->icon('heroicon-o-document-plus')
-                ->color('warning')
+                ->color('success')
                 ->url(fn() => ResumenPedidosResource::getUrl('create'))
                 ->openUrlInNewTab(),
         ];
