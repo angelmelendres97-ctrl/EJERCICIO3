@@ -330,6 +330,12 @@
 
                         $codigoMostrar = $auxiliarData['codigo'] ?? $detalle->codigo_producto;
                         $descripcionMostrar = $auxiliarData['descripcion'] ?? $detalle->producto;
+                        if (!empty($auxiliarData['descripcion_auxiliar'])) {
+                            $descripcionMostrar = trim(collect([
+                                $descripcionMostrar,
+                                'Descripción auxiliar: ' . $auxiliarData['descripcion_auxiliar'],
+                            ])->filter()->implode(' | '));
+                        }
                     @endphp
                     <tr>
                         <td class="center">{{ $key + 1 }}</td>

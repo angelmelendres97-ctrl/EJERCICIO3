@@ -145,11 +145,16 @@ class CreateOrdenCompra extends CreateRecord
                 'es_auxiliar' => $esAuxiliar,
                 'es_servicio' => $esServicio,
                 'auxiliar_codigo' => $first->dped_cod_auxiliar ?? null,
+                'auxiliar_descripcion' => $first->dped_desc_auxiliar
+                    ?? $first->dped_desc_axiliar
+                    ?? null,
                 'auxiliar_nombre' => $first->dped_det_dped
+                    ?? $first->dped_desc_auxiliar
                     ?? $first->dped_desc_axiliar
                     ?? $first->deped_prod_nom
                     ?? null,
                 'servicio_nombre' => $first->dped_det_dped
+                    ?? $first->dped_desc_auxiliar
                     ?? $first->dped_desc_axiliar
                     ?? $first->deped_prod_nom
                     ?? null,
@@ -195,11 +200,13 @@ class CreateOrdenCompra extends CreateRecord
                     $auxiliarDescripcion = trim(collect([
                         $detalle->auxiliar_codigo ? 'Código auxiliar: ' . $detalle->auxiliar_codigo : null,
                         $detalle->auxiliar_nombre ? 'Descripción: ' . $detalle->auxiliar_nombre : null,
+                        $detalle->auxiliar_descripcion ? 'Descripción auxiliar: ' . $detalle->auxiliar_descripcion : null,
                     ])->filter()->implode(' | '));
 
                     $auxiliarData = [
                         'codigo' => $detalle->auxiliar_codigo,
                         'descripcion' => $detalle->auxiliar_nombre,
+                        'descripcion_auxiliar' => $detalle->auxiliar_descripcion,
                     ];
                 }
 
