@@ -313,7 +313,6 @@ class OrdenCompraResource extends Resource
                                                     Step::make('Empresas')
                                                         ->schema([$schema[4]]),
                                                 ])
-                                                    ->submitActionLabel('Crear proveedor'),
                                             ])
                                             ->model(Proveedores::class);
                                     })
@@ -500,7 +499,6 @@ class OrdenCompraResource extends Resource
                                             Step::make('Sucursales y Bodegas Externas')
                                                 ->schema([$schema[2]]),
                                         ])
-                                            ->submitActionLabel('Registrar producto'),
                                     ])
                                     ->model(Producto::class);
                             })
