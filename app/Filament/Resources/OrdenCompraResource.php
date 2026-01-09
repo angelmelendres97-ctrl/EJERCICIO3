@@ -284,16 +284,72 @@ class OrdenCompraResource extends Resource
                             ->suffixAction(
                                 /*
                                 |--------------------------------------------------------------------------
-                                | Antes: modal para crear proveedor (DESACTIVADO).
-                                | Ahora: link directo a /admin/proveedors/create
+                                | Modal para crear proveedor desde la orden de compra.
                                 |--------------------------------------------------------------------------
                                 */
-                                Action::make('ir_crear_proveedor')
+                                Action::make('crear_proveedor')
                                     ->label('+')
                                     ->tooltip('Crear proveedor')
                                     ->icon('heroicon-o-plus')
-                                    ->url(fn() => url('/admin/proveedors/create'))
-                                    ->openUrlInNewTab()
+                                    ->modalHeading('Crear proveedor')
+                                    ->modalWidth('7xl')
+                                    ->form(ProveedorResource::getFormSchema())
+                                    ->fillForm(function (Get $get): array {
+                                        $empresaId = $get('id_empresa');
+                                        $amdgIdEmpresa = $get('amdg_id_empresa');
+                                        $amdgIdSucursal = $get('amdg_id_sucursal');
+                                        $lineaNegocioId = $empresaId ? Empresa::find($empresaId)?->linea_negocio_id : null;
+
+                                        return [
+                                            'id_empresa' => $empresaId,
+                                            'admg_id_empresa' => $amdgIdEmpresa,
+                                            'admg_id_sucursal' => $amdgIdSucursal,
+                                            'lineasNegocio' => $lineaNegocioId ? [$lineaNegocioId] : [],
+                                            'empresas_proveedor' => ($empresaId && $amdgIdEmpresa)
+                                                ? [$empresaId . '-' . $amdgIdEmpresa]
+                                                : [],
+                                        ];
+                                    })
+                                    ->action(function (array $data, Set $set, Get $get): void {
+                                        DB::transaction(function () use ($data): void {
+                                            $record = Proveedores::create($data);
+                                            $lineasNegocioIds = $data['lineasNegocio'] ?? [];
+                                            $record->lineasNegocio()->attach($lineasNegocioIds);
+
+                                            ProveedorSyncService::sincronizar($record, $data);
+                                        });
+
+                                        $empresaId = $get('id_empresa');
+                                        $amdgIdEmpresa = $get('amdg_id_empresa');
+                                        if (!$empresaId || !$amdgIdEmpresa) {
+                                            return;
+                                        }
+
+                                        $connectionName = self::getExternalConnectionName($empresaId);
+                                        if (!$connectionName) {
+                                            return;
+                                        }
+
+                                        $proveedor = DB::connection($connectionName)
+                                            ->table('saeclpv')
+                                            ->where('clpv_cod_empr', $amdgIdEmpresa)
+                                            ->where('clpv_ruc_clpv', $data['ruc'])
+                                            ->where('clpv_clopv_clpv', 'PV')
+                                            ->select('clpv_cod_clpv', 'clpv_nom_clpv', 'clpv_ruc_clpv')
+                                            ->first();
+
+                                        if ($proveedor) {
+                                            $set('info_proveedor', $proveedor->clpv_cod_clpv);
+                                            $set('identificacion', $proveedor->clpv_ruc_clpv);
+                                            $set('id_proveedor', $proveedor->clpv_cod_clpv);
+                                            $set('proveedor', $proveedor->clpv_nom_clpv);
+                                        }
+
+                                        Notification::make()
+                                            ->title('Proveedor creado correctamente.')
+                                            ->success()
+                                            ->send();
+                                    })
                             )
                             ->afterStateUpdated(function (Set $set, Get $get, ?string $state) {
                                 if (empty($state)) {
@@ -413,15 +469,42 @@ class OrdenCompraResource extends Resource
                     ->headerActions([
                         /*
                         |--------------------------------------------------------------------------
-                        | Antes: modal para registrar producto (DESACTIVADO).
-                        | Ahora: link directo a /admin/products/create
+                        | Modal para registrar producto desde la orden de compra.
                         |--------------------------------------------------------------------------
                         */
-                        Action::make('ir_crear_producto')
+                        Action::make('crear_producto')
                             ->label('+ Registrar nuevo producto')
                             ->icon('heroicon-o-plus')
-                            ->url(fn() => url('/admin/productos/create'))
-                            ->openUrlInNewTab(),
+                            ->modalHeading('Registrar nuevo producto')
+                            ->modalWidth('7xl')
+                            ->form(ProductoResource::getFormSchema())
+                            ->fillForm(function (Get $get): array {
+                                $empresaId = $get('id_empresa');
+                                $amdgIdEmpresa = $get('amdg_id_empresa');
+                                $amdgIdSucursal = $get('amdg_id_sucursal');
+                                $lineaNegocioId = $empresaId ? Empresa::find($empresaId)?->linea_negocio_id : null;
+
+                                return [
+                                    'id_empresa' => $empresaId,
+                                    'amdg_id_empresa' => $amdgIdEmpresa,
+                                    'amdg_id_sucursal' => $amdgIdSucursal,
+                                    'lineasNegocio' => $lineaNegocioId ? [$lineaNegocioId] : [],
+                                ];
+                            })
+                            ->action(function (array $data): void {
+                                DB::transaction(function () use ($data): void {
+                                    $record = Producto::create($data);
+                                    $lineasNegocioIds = $data['lineasNegocio'] ?? [];
+                                    $record->lineasNegocio()->attach($lineasNegocioIds);
+
+                                    ProductoSyncService::sincronizar($record, $data);
+                                });
+
+                                Notification::make()
+                                    ->title('Producto creado correctamente.')
+                                    ->success()
+                                    ->send();
+                            }),
                     ])
                     ->schema([
                         Forms\Components\Repeater::make('detalles')
@@ -569,21 +652,21 @@ class OrdenCompraResource extends Resource
                                         Forms\Components\TextInput::make('cantidad')
                                             ->numeric()
                                             ->required()
-                                            ->live()
+                                            ->live(onBlur: true)
                                             ->default(1)
                                             ->columnSpan(['default' => 12, 'lg' => 1]),
 
                                         Forms\Components\TextInput::make('costo')
                                             ->numeric()
                                             ->required()
-                                            ->live()
+                                            ->live(onBlur: true)
                                             ->prefix('$')
                                             ->columnSpan(['default' => 12, 'lg' => 2]),
 
                                         Forms\Components\TextInput::make('descuento')
                                             ->numeric()
                                             ->required()
-                                            ->live()
+                                            ->live(onBlur: true)
                                             ->default(0)
                                             ->prefix('$')
                                             ->columnSpan(['default' => 12, 'lg' => 2]),
