@@ -35,6 +35,10 @@ class EmpresaResource extends Resource
                             ->required()
                             ->maxLength(255)
                             ->placeholder('Nombre de la empresa'),
+                        Forms\Components\TextInput::make('nombre_pb')
+                            ->label('Nombre PB')
+                            ->maxLength(255)
+                            ->placeholder('Nombre alterno para PB'),
                         Forms\Components\Select::make('tipo')
                             ->required()
                             ->options([
@@ -95,6 +99,9 @@ class EmpresaResource extends Resource
                 Tables\Columns\TextColumn::make('ruc')
                     ->searchable(),
                 Tables\Columns\TextColumn::make('nombre_empresa')
+                    ->searchable(),
+                Tables\Columns\TextColumn::make('nombre_pb')
+                    ->label('Nombre PB')
                     ->searchable(),
                 Tables\Columns\TextColumn::make('tipo'),
                 Tables\Columns\TextColumn::make('lineaNegocio.nombre')

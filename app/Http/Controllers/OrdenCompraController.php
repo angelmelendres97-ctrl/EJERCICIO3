@@ -26,7 +26,9 @@ class OrdenCompraController extends Controller
         $ordenCompra->load('detalles', 'empresa', 'usuario');
 
         $nombreEmpresaTitulo = $ordenCompra->empresa->nombre_empresa ?? 'Nombre de Empresa no disponible';
-        if ($ordenCompra->presupuesto === 'AZ') {
+        if ($ordenCompra->presupuesto === 'PB') {
+            $nombreEmpresaTitulo = $ordenCompra->empresa->nombre_pb ?: $nombreEmpresaTitulo;
+        } elseif ($ordenCompra->presupuesto === 'AZ') {
             $connectionName = OrdenCompraResource::getExternalConnectionName((int) $ordenCompra->id_empresa);
             if ($connectionName) {
                 try {
