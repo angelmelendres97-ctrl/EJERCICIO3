@@ -323,6 +323,7 @@ class OrdenCompraResource extends Resource
                                             'id_empresa' => $data['id_empresa'] ?? null,
                                             'admg_id_empresa' => $data['amdg_id_empresa'] ?? null,
                                             'admg_id_sucursal' => $data['amdg_id_sucursal'] ?? null,
+                                            'lock_conexion' => true,
                                         ]);
                                     })
                                     ->action(function (array $data, Set $set, Get $get): void {
@@ -511,6 +512,7 @@ class OrdenCompraResource extends Resource
                                     'id_empresa' => $data['id_empresa'] ?? null,
                                     'amdg_id_empresa' => $data['amdg_id_empresa'] ?? null,
                                     'amdg_id_sucursal' => $data['amdg_id_sucursal'] ?? null,
+                                    'lock_conexion' => true,
                                 ]);
                             })
                             ->action(function (array $data): void {

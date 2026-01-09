@@ -64,12 +64,17 @@ class ProveedorResource extends Resource
         return [
             Forms\Components\Section::make('Información General')
                 ->schema([
+                    Forms\Components\Hidden::make('lock_conexion')
+                        ->default(false)
+                        ->dehydrated(false),
                     Forms\Components\Select::make('id_empresa')
                         ->label('Conexion')
                         ->relationship('empresa', 'nombre_empresa')
                         ->searchable()
                         ->preload()
                         ->live()
+                        ->disabled(fn(Get $get) => (bool) $get('lock_conexion'))
+                        ->dehydrated()
                         ->afterStateUpdated(function (callable $set): void {
                             $set('admg_id_empresa', null);
                             $set('admg_id_sucursal', null);
@@ -102,6 +107,9 @@ class ProveedorResource extends Resource
                         ->searchable()
                         ->preload()
                         ->live()
+                        ->reactive()
+                        ->disabled(fn(Get $get) => (bool) $get('lock_conexion'))
+                        ->dehydrated()
                         ->afterStateUpdated(fn(callable $set) => $set('admg_id_sucursal', null))
                         ->required(),
 
@@ -134,6 +142,9 @@ class ProveedorResource extends Resource
                         ->searchable()
                         ->preload()
                         ->live()
+                        ->reactive()
+                        ->disabled(fn(Get $get) => (bool) $get('lock_conexion'))
+                        ->dehydrated()
                         ->required(),
 
                     Forms\Components\Select::make('tipo')

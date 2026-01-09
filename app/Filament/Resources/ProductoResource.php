@@ -78,12 +78,21 @@ class ProductoResource extends Resource
         return [
                 Forms\Components\Section::make('Conexion e informacion principal')
                     ->schema([
+                        Forms\Components\Hidden::make('lock_conexion')
+                            ->default(false)
+                            ->dehydrated(false),
                         Forms\Components\Select::make('id_empresa')
                             ->label('Conexion')
                             ->relationship('empresa', 'nombre_empresa')
                             ->searchable()
                             ->preload()
                             ->live()
+                            ->disabled(fn(Get $get) => (bool) $get('lock_conexion'))
+                            ->dehydrated()
+                            ->afterStateUpdated(function (callable $set): void {
+                                $set('amdg_id_empresa', null);
+                                $set('amdg_id_sucursal', null);
+                            })
                             ->required(),
                         Forms\Components\Select::make('amdg_id_empresa')
                             ->label('Empresa')
@@ -111,6 +120,10 @@ class ProductoResource extends Resource
                             ->searchable()
                             ->preload()
                             ->live()
+                            ->reactive()
+                            ->disabled(fn(Get $get) => (bool) $get('lock_conexion'))
+                            ->dehydrated()
+                            ->afterStateUpdated(fn(callable $set) => $set('amdg_id_sucursal', null))
                             ->required(),
 
                         Forms\Components\Select::make('amdg_id_sucursal')
@@ -142,6 +155,9 @@ class ProductoResource extends Resource
                             ->searchable()
                             ->preload()
                             ->live()
+                            ->reactive()
+                            ->disabled(fn(Get $get) => (bool) $get('lock_conexion'))
+                            ->dehydrated()
                             ->required(),
                         Forms\Components\Select::make('linea')
                             ->label('Línea')
