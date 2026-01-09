@@ -316,11 +316,13 @@ class OrdenCompraResource extends Resource
                                             ])
                                             ->model(Proveedores::class);
                                     })
-                                    ->mountUsing(function (Action $action, Get $get): void {
+                                    ->mountUsing(function (Action $action): void {
+                                        $data = data_get($action->getLivewire(), 'data', []);
+
                                         $action->fillForm([
-                                            'id_empresa' => $get('id_empresa'),
-                                            'admg_id_empresa' => $get('amdg_id_empresa'),
-                                            'admg_id_sucursal' => $get('amdg_id_sucursal'),
+                                            'id_empresa' => $data['id_empresa'] ?? null,
+                                            'admg_id_empresa' => $data['amdg_id_empresa'] ?? null,
+                                            'admg_id_sucursal' => $data['amdg_id_sucursal'] ?? null,
                                         ]);
                                     })
                                     ->action(function (array $data, Set $set, Get $get): void {
@@ -502,11 +504,13 @@ class OrdenCompraResource extends Resource
                                     ])
                                     ->model(Producto::class);
                             })
-                            ->mountUsing(function (Action $action, Get $get): void {
+                            ->mountUsing(function (Action $action): void {
+                                $data = data_get($action->getLivewire(), 'data', []);
+
                                 $action->fillForm([
-                                    'id_empresa' => $get('id_empresa'),
-                                    'amdg_id_empresa' => $get('amdg_id_empresa'),
-                                    'amdg_id_sucursal' => $get('amdg_id_sucursal'),
+                                    'id_empresa' => $data['id_empresa'] ?? null,
+                                    'amdg_id_empresa' => $data['amdg_id_empresa'] ?? null,
+                                    'amdg_id_sucursal' => $data['amdg_id_sucursal'] ?? null,
                                 ]);
                             })
                             ->action(function (array $data): void {
