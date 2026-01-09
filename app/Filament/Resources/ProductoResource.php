@@ -84,6 +84,10 @@ class ProductoResource extends Resource
                             ->searchable()
                             ->preload()
                             ->live()
+                            ->afterStateUpdated(function (callable $set): void {
+                                $set('amdg_id_empresa', null);
+                                $set('amdg_id_sucursal', null);
+                            })
                             ->required(),
                         Forms\Components\Select::make('amdg_id_empresa')
                             ->label('Empresa')
@@ -111,6 +115,8 @@ class ProductoResource extends Resource
                             ->searchable()
                             ->preload()
                             ->live()
+                            ->reactive()
+                            ->afterStateUpdated(fn(callable $set) => $set('amdg_id_sucursal', null))
                             ->required(),
 
                         Forms\Components\Select::make('amdg_id_sucursal')
@@ -142,6 +148,7 @@ class ProductoResource extends Resource
                             ->searchable()
                             ->preload()
                             ->live()
+                            ->reactive()
                             ->required(),
                         Forms\Components\Select::make('linea')
                             ->label('Línea')
