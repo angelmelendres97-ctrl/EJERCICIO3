@@ -24,8 +24,6 @@ use App\Services\ProductoSyncService;
 use Filament\Forms\Components\Placeholder;
 use Filament\Forms\Components\Section;
 use Filament\Forms\Components\Grid;
-use Filament\Forms\Components\Wizard;
-use Filament\Forms\Components\Wizard\Step;
 
 use Filament\Forms\Components\Actions\Action;
 use Filament\Forms\Components\Actions;
@@ -297,23 +295,8 @@ class OrdenCompraResource extends Resource
                                     ->modalWidth('7xl')
                                     ->modalSubmitActionLabel('Crear proveedor')
                                     ->form(function (Form $form): Form {
-                                        $schema = ProveedorResource::getFormSchema();
-
                                         return $form
-                                            ->schema([
-                                                Wizard::make([
-                                                    Step::make('Información General')
-                                                        ->schema([$schema[0]]),
-                                                    Step::make('Clasificación')
-                                                        ->schema([$schema[1]]),
-                                                    Step::make('Retención')
-                                                        ->schema([$schema[2]]),
-                                                    Step::make('Información Adicional')
-                                                        ->schema([$schema[3]]),
-                                                    Step::make('Empresas')
-                                                        ->schema([$schema[4]]),
-                                                ])
-                                            ])
+                                            ->schema(ProveedorResource::getFormSchema())
                                             ->model(Proveedores::class);
                                     })
                                     ->mountUsing(function (Action $action, Get $get): void {
@@ -487,19 +470,8 @@ class OrdenCompraResource extends Resource
                             ->modalWidth('7xl')
                             ->modalSubmitActionLabel('Registrar producto')
                             ->form(function (Form $form): Form {
-                                $schema = ProductoResource::getFormSchema();
-
                                 return $form
-                                    ->schema([
-                                        Wizard::make([
-                                            Step::make('Conexión e información principal')
-                                                ->schema([$schema[0]]),
-                                            Step::make('Información Producto')
-                                                ->schema([$schema[1]]),
-                                            Step::make('Sucursales y Bodegas Externas')
-                                                ->schema([$schema[2]]),
-                                        ])
-                                    ])
+                                    ->schema(ProductoResource::getFormSchema())
                                     ->model(Producto::class);
                             })
                             ->mountUsing(function (Action $action, Get $get): void {
