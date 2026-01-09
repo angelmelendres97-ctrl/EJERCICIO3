@@ -17,6 +17,7 @@ class CreateProducto extends CreateRecord
     protected function handleRecordCreation(array $data): Model
     {
         return DB::transaction(function () use ($data) {
+
             // 1. Create the local record
             $record = static::getModel()::create($data);
 
