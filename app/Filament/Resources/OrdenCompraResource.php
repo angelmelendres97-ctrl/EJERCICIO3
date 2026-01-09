@@ -1493,6 +1493,14 @@ class OrdenCompraResource extends Resource
                         ->searchable()
                         ->preload()
                         ->live()
+                        ->afterStateUpdated(function (callable $set): void {
+                            $set('amdg_id_empresa', null);
+                            $set('amdg_id_sucursal', null);
+                            $set('linea', null);
+                            $set('grupo', null);
+                            $set('categoria', null);
+                            $set('marca', null);
+                        })
                         ->required(),
                     Forms\Components\Select::make('amdg_id_empresa')
                         ->label('Empresa')
@@ -1500,6 +1508,13 @@ class OrdenCompraResource extends Resource
                         ->searchable()
                         ->preload()
                         ->live()
+                        ->afterStateUpdated(function (callable $set): void {
+                            $set('amdg_id_sucursal', null);
+                            $set('linea', null);
+                            $set('grupo', null);
+                            $set('categoria', null);
+                            $set('marca', null);
+                        })
                         ->required(),
 
                     Forms\Components\Select::make('amdg_id_sucursal')
