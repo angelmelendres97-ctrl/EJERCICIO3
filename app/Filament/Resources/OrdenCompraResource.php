@@ -14,8 +14,6 @@ use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\DB;
 use Filament\Forms\Get;
 use Filament\Forms\Set;
-use App\Filament\Resources\ProveedorResource;
-use App\Filament\Resources\ProductoResource;
 use App\Models\Proveedores;
 use App\Models\Producto;
 use App\Services\ProveedorSyncService;
@@ -31,9 +29,9 @@ use Filament\Forms\Components\Actions\Action;
 use Filament\Forms\Components\Actions;
 use Filament\Forms\Components\View;
 use Filament\Actions\StaticAction;
-use Illuminate\Database\Eloquent\Model; // ESTA LÍNEA ES NECESARIA
 use Filament\Notifications\Notification;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Support\HtmlString;
 
 class OrdenCompraResource extends Resource
 {
@@ -297,32 +295,22 @@ class OrdenCompraResource extends Resource
                                     ->modalWidth('7xl')
                                     ->modalSubmitActionLabel('Crear proveedor')
                                     ->form(function (Form $form): Form {
-                                        $schema = ProveedorResource::getFormSchema();
-
                                         return $form
                                             ->schema([
-                                                Wizard::make([
-                                                    Step::make('Información General')
-                                                        ->schema([$schema[0]]),
-                                                    Step::make('Clasificación')
-                                                        ->schema([$schema[1]]),
-                                                    Step::make('Retención')
-                                                        ->schema([$schema[2]]),
-                                                    Step::make('Información Adicional')
-                                                        ->schema([$schema[3]]),
-                                                    Step::make('Empresas')
-                                                        ->schema([$schema[4]]),
-                                                ])
+                                                self::getProveedorModalWizard(),
                                             ])
                                             ->model(Proveedores::class);
                                     })
                                     ->mountUsing(function (Action $action): void {
                                         $data = data_get($action->getLivewire(), 'data', []);
+                                        $empresaId = $data['id_empresa'] ?? null;
+                                        $lineaNegocioId = $empresaId ? Empresa::find($empresaId)?->linea_negocio_id : null;
 
                                         $action->fillForm([
                                             'id_empresa' => $data['id_empresa'] ?? null,
                                             'admg_id_empresa' => $data['amdg_id_empresa'] ?? null,
                                             'admg_id_sucursal' => $data['amdg_id_sucursal'] ?? null,
+                                            'lineasNegocio' => $lineaNegocioId ? [$lineaNegocioId] : [],
                                         ]);
                                     })
                                     ->action(function (array $data, Set $set, Get $get): void {
@@ -489,31 +477,25 @@ class OrdenCompraResource extends Resource
                             ->modalWidth('7xl')
                             ->modalSubmitActionLabel('Registrar producto')
                             ->form(function (Form $form): Form {
-                                $schema = ProductoResource::getFormSchema();
-
                                 return $form
                                     ->schema([
-                                        Wizard::make([
-                                            Step::make('Conexión e información principal')
-                                                ->schema([$schema[0]]),
-                                            Step::make('Información Producto')
-                                                ->schema([$schema[1]]),
-                                            Step::make('Sucursales y Bodegas Externas')
-                                                ->schema([$schema[2]]),
-                                        ])
+                                        self::getProductoModalWizard(),
                                     ])
                                     ->model(Producto::class);
                             })
                             ->mountUsing(function (Action $action): void {
                                 $data = data_get($action->getLivewire(), 'data', []);
+                                $empresaId = $data['id_empresa'] ?? null;
+                                $lineaNegocioId = $empresaId ? Empresa::find($empresaId)?->linea_negocio_id : null;
 
                                 $action->fillForm([
                                     'id_empresa' => $data['id_empresa'] ?? null,
                                     'amdg_id_empresa' => $data['amdg_id_empresa'] ?? null,
                                     'amdg_id_sucursal' => $data['amdg_id_sucursal'] ?? null,
+                                    'lineasNegocio' => $lineaNegocioId ? [$lineaNegocioId] : [],
                                 ]);
                             })
-                            ->action(function (array $data): void {
+                            ->action(function (array $data, Set $set, Get $get): void {
                                 $record = Producto::create($data);
                                 $lineasNegocioIds = $data['lineasNegocio'] ?? [];
                                 if (!empty($lineasNegocioIds)) {
@@ -521,6 +503,59 @@ class OrdenCompraResource extends Resource
                                 }
 
                                 ProductoSyncService::sincronizar($record, $data);
+
+                                $sku = $data['sku'] ?? null;
+                                if ($sku) {
+                                    $detalles = $get('detalles') ?? [];
+                                    $applied = false;
+
+                                    foreach ($detalles as &$detalle) {
+                                        if (!empty($detalle['id_bodega']) && empty($detalle['codigo_producto'])) {
+                                            $detalle['codigo_producto'] = $sku;
+                                            $detalle['producto'] = isset($data['nombre'])
+                                                ? "{$data['nombre']} ({$sku})"
+                                                : $sku;
+                                            $applied = true;
+                                            break;
+                                        }
+                                    }
+                                    unset($detalle);
+
+                                    if (!$applied) {
+                                        $defaultBodega = null;
+                                        $empresaId = $get('id_empresa');
+                                        $amdgIdEmpresa = $get('amdg_id_empresa');
+                                        $amdgIdSucursal = $get('amdg_id_sucursal');
+
+                                        if ($empresaId && $amdgIdEmpresa && $amdgIdSucursal) {
+                                            $connectionName = self::getExternalConnectionName($empresaId);
+                                            if ($connectionName) {
+                                                $defaultBodega = DB::connection($connectionName)
+                                                    ->table('saebode')
+                                                    ->join('saesubo', 'subo_cod_bode', '=', 'bode_cod_bode')
+                                                    ->where('subo_cod_empr', $amdgIdEmpresa)
+                                                    ->where('bode_cod_empr', $amdgIdEmpresa)
+                                                    ->where('subo_cod_sucu', $amdgIdSucursal)
+                                                    ->orderBy('bode_cod_bode')
+                                                    ->value('bode_cod_bode');
+                                            }
+                                        }
+
+                                        $detalles[] = [
+                                            'id_bodega' => $defaultBodega,
+                                            'codigo_producto' => $sku,
+                                            'cantidad' => 1,
+                                            'costo' => 0,
+                                            'descuento' => 0,
+                                            'impuesto' => 0,
+                                            'producto' => isset($data['nombre'])
+                                                ? "{$data['nombre']} ({$sku})"
+                                                : $sku,
+                                        ];
+                                    }
+
+                                    $set('detalles', $detalles);
+                                }
 
                                 Notification::make()
                                     ->title('Producto creado correctamente.')
@@ -1107,6 +1142,785 @@ class OrdenCompraResource extends Resource
                     ])->columns(1),
 
             ])->live();
+    }
+
+    private static function getProveedorModalWizard(): Wizard
+    {
+        return Wizard::make([
+            Step::make('Información General')
+                ->schema([
+                    Forms\Components\Hidden::make('id_empresa')->required(),
+                    Forms\Components\Hidden::make('admg_id_empresa')->required(),
+                    Forms\Components\Hidden::make('admg_id_sucursal')->required(),
+                    Forms\Components\Select::make('tipo')
+                        ->label('Tipo Identificacion')
+                        ->options(function (Get $get) {
+                            $empresaId = $get('id_empresa');
+                            $amdgIdEmpresaCode = $get('admg_id_empresa');
+
+                            if (!$empresaId || !$amdgIdEmpresaCode) {
+                                return [];
+                            }
+
+                            $connectionName = self::getExternalConnectionName($empresaId);
+                            if (!$connectionName) {
+                                return [];
+                            }
+
+                            try {
+                                return DB::connection($connectionName)
+                                    ->table('comercial.tipo_iden_clpv')
+                                    ->pluck('identificacion', 'identificacion')
+                                    ->all();
+                            } catch (\Exception $e) {
+                                return [];
+                            }
+                        })
+                        ->searchable()
+                        ->required(),
+                    Forms\Components\TextInput::make('ruc')
+                        ->label('Identificacion')
+                        ->required()
+                        ->maxLength(13),
+                    Forms\Components\TextInput::make('nombre')
+                        ->label('Nombre')
+                        ->required()
+                        ->maxLength(255)
+                        ->live(onBlur: true)
+                        ->afterStateUpdated(function ($state, callable $set) {
+                            $set('nombre_comercial', $state);
+                        }),
+                    Forms\Components\TextInput::make('nombre_comercial')
+                        ->label('Nombre Comercial')
+                        ->required()
+                        ->maxLength(255),
+                ])
+                ->columns(2),
+            Step::make('Clasificación')
+                ->schema([
+                    Forms\Components\Select::make('grupo')
+                        ->label('Grupo')
+                        ->options(function (Get $get) {
+                            $empresaId = $get('id_empresa');
+                            $amdgIdEmpresaCode = $get('admg_id_empresa');
+
+                            if (!$empresaId || !$amdgIdEmpresaCode) {
+                                return [];
+                            }
+
+                            $connectionName = self::getExternalConnectionName($empresaId);
+                            if (!$connectionName) {
+                                return [];
+                            }
+
+                            try {
+                                return DB::connection($connectionName)
+                                    ->table('saegrpv')
+                                    ->where('grpv_cod_empr', $amdgIdEmpresaCode)
+                                    ->where('grpv_cod_modu', 4)
+                                    ->pluck('grpv_nom_grpv', 'grpv_nom_grpv')
+                                    ->all();
+                            } catch (\Exception $e) {
+                                return [];
+                            }
+                        })
+                        ->searchable()
+                        ->required(),
+                    Forms\Components\Select::make('zona')
+                        ->label('Zona')
+                        ->options(function (Get $get) {
+                            $empresaId = $get('id_empresa');
+                            $amdgIdEmpresaCode = $get('admg_id_empresa');
+
+                            if (!$empresaId || !$amdgIdEmpresaCode) {
+                                return [];
+                            }
+
+                            $connectionName = self::getExternalConnectionName($empresaId);
+                            if (!$connectionName) {
+                                return [];
+                            }
+
+                            try {
+                                return DB::connection($connectionName)
+                                    ->table('saezona')
+                                    ->where('zona_cod_empr', $amdgIdEmpresaCode)
+                                    ->pluck('zona_nom_zona', 'zona_nom_zona')
+                                    ->all();
+                            } catch (\Exception $e) {
+                                return [];
+                            }
+                        })
+                        ->searchable()
+                        ->required(),
+                    Forms\Components\Select::make('flujo_caja')
+                        ->label('Flujo de Caja')
+                        ->options(function (Get $get) {
+                            $empresaId = $get('id_empresa');
+                            $amdgIdEmpresaCode = $get('admg_id_empresa');
+
+                            if (!$empresaId || !$amdgIdEmpresaCode) {
+                                return [];
+                            }
+
+                            $connectionName = self::getExternalConnectionName($empresaId);
+                            if (!$connectionName) {
+                                return [];
+                            }
+
+                            try {
+                                return DB::connection($connectionName)
+                                    ->table('saecact')
+                                    ->where('cact_cod_empr', $amdgIdEmpresaCode)
+                                    ->pluck('cact_nom_cact', 'cact_nom_cact')
+                                    ->all();
+                            } catch (\Exception $e) {
+                                return [];
+                            }
+                        })
+                        ->searchable()
+                        ->required(),
+                    Forms\Components\Select::make('tipo_proveedor')
+                        ->label('Tipo de proveedor')
+                        ->options(function (Get $get) {
+                            $empresaId = $get('id_empresa');
+                            $amdgIdEmpresaCode = $get('admg_id_empresa');
+
+                            if (!$empresaId || !$amdgIdEmpresaCode) {
+                                return [];
+                            }
+
+                            $connectionName = self::getExternalConnectionName($empresaId);
+                            if (!$connectionName) {
+                                return [];
+                            }
+
+                            try {
+                                return DB::connection($connectionName)
+                                    ->table('saetprov')
+                                    ->where('tprov_cod_empr', $amdgIdEmpresaCode)
+                                    ->pluck('tprov_des_tprov', 'tprov_des_tprov')
+                                    ->all();
+                            } catch (\Exception $e) {
+                                return [];
+                            }
+                        })
+                        ->searchable()
+                        ->required(),
+                ])
+                ->columns(2),
+            Step::make('Condiciones de Pago')
+                ->schema([
+                    Forms\Components\Select::make('forma_pago')
+                        ->label('Forma de Pago')
+                        ->options(function (Get $get) {
+                            $empresaId = $get('id_empresa');
+                            $amdgIdEmpresaCode = $get('admg_id_empresa');
+
+                            if (!$empresaId || !$amdgIdEmpresaCode) {
+                                return [];
+                            }
+
+                            $connectionName = self::getExternalConnectionName($empresaId);
+                            if (!$connectionName) {
+                                return [];
+                            }
+
+                            try {
+                                return DB::connection($connectionName)
+                                    ->table('saefpagop')
+                                    ->where('fpagop_cod_empr', $amdgIdEmpresaCode)
+                                    ->pluck('fpagop_des_fpagop', 'fpagop_des_fpagop')
+                                    ->all();
+                            } catch (\Exception $e) {
+                                return [];
+                            }
+                        })
+                        ->searchable()
+                        ->required(),
+                    Forms\Components\Select::make('destino_pago')
+                        ->label('Destino Pago')
+                        ->options(function (Get $get) {
+                            $empresaId = $get('id_empresa');
+                            $amdgIdEmpresaCode = $get('admg_id_empresa');
+
+                            if (!$empresaId || !$amdgIdEmpresaCode) {
+                                return [];
+                            }
+
+                            $connectionName = self::getExternalConnectionName($empresaId);
+                            if (!$connectionName) {
+                                return [];
+                            }
+
+                            try {
+                                return DB::connection($connectionName)
+                                    ->table('saetpago')
+                                    ->where('tpago_cod_empr', $amdgIdEmpresaCode)
+                                    ->pluck('tpago_des_tpago', 'tpago_des_tpago')
+                                    ->all();
+                            } catch (\Exception $e) {
+                                return [];
+                            }
+                        })
+                        ->searchable()
+                        ->required(),
+                    Forms\Components\Select::make('pais_pago')
+                        ->label('Pais de Pago')
+                        ->options(function (Get $get) {
+                            $empresaId = $get('id_empresa');
+                            $amdgIdEmpresaCode = $get('admg_id_empresa');
+
+                            if (!$empresaId || !$amdgIdEmpresaCode) {
+                                return [];
+                            }
+
+                            $connectionName = self::getExternalConnectionName($empresaId);
+                            if (!$connectionName) {
+                                return [];
+                            }
+
+                            try {
+                                return DB::connection($connectionName)
+                                    ->table('saepaisp')
+                                    ->pluck('paisp_des_paisp', 'paisp_des_paisp')
+                                    ->all();
+                            } catch (\Exception $e) {
+                                return [];
+                            }
+                        })
+                        ->searchable()
+                        ->required(),
+                    Forms\Components\TextInput::make('dias_pago')
+                        ->numeric()
+                        ->label('Días de Pago'),
+                    Forms\Components\TextInput::make('limite_credito')
+                        ->numeric()
+                        ->label('Límite de Crédito')
+                        ->step('0.01'),
+                    Forms\Components\Select::make('lineasNegocio')
+                        ->label('Líneas de Negocio')
+                        ->relationship('lineasNegocio', 'nombre')
+                        ->multiple()
+                        ->preload()
+                        ->searchable()
+                        ->live()
+                        ->required(),
+                ])
+                ->columns(2),
+            Step::make('Retención')
+                ->schema([
+                    Forms\Components\Toggle::make('aplica_retencion_sn')
+                        ->label('¿Aplica Retención?')
+                        ->default(false),
+                ]),
+            Step::make('Información Adicional')
+                ->schema([
+                    Forms\Components\TextInput::make('telefono')
+                        ->label('Telefono')
+                        ->required()
+                        ->maxLength(20),
+                    Forms\Components\TextInput::make('correo')
+                        ->label('Email')
+                        ->required()
+                        ->maxLength(255),
+                    Forms\Components\TextInput::make('direcccion')
+                        ->label('Dirección')
+                        ->required()
+                        ->maxLength(255),
+                ])
+                ->columns(2),
+            Step::make('Empresas')
+                ->schema([
+                    Forms\Components\CheckboxList::make('empresas_proveedor')
+                        ->label('Empresas para replicar')
+                        ->options(function (Get $get) {
+                            $lineasNegocioIds = $get('lineasNegocio');
+                            $amdgIdEmpresaCode = $get('admg_id_empresa');
+                            $ruc = $get('ruc');
+
+                            if (empty($lineasNegocioIds)) {
+                                return [];
+                            }
+
+                            $empresas = Empresa::whereIn('linea_negocio_id', $lineasNegocioIds)
+                                ->where('status_conexion', true)->get();
+
+                            $empresasOptions = [];
+
+                            foreach ($empresas as $empresa) {
+                                $connectionName = self::getExternalConnectionName($empresa->id);
+                                if (!$connectionName) {
+                                    continue;
+                                }
+
+                                try {
+                                    $externalEmpresas = DB::connection($connectionName)
+                                        ->table('saeempr')
+                                        ->get();
+
+                                    foreach ($externalEmpresas as $data_empresa) {
+                                        $optionKey = $empresa->id . '-' . trim($data_empresa->empr_cod_empr);
+                                        $optionLabel = $empresa->nombre_empresa . ' - ' . $data_empresa->empr_nom_empr;
+                                        $empresasOptions[$optionKey] = $optionLabel;
+                                    }
+                                } catch (\Exception $e) {
+                                    \Log::error('Error al conectar con la base de datos externa para la empresa ID ' . $empresa->id . ': ' . $e->getMessage());
+                                    continue;
+                                }
+                            }
+
+                            return $empresasOptions;
+                        })
+                        ->afterStateHydrated(function (Get $get, callable $set) {
+                            $lineasNegocioIds = $get('lineasNegocio');
+                            $amdgIdEmpresaCode = $get('admg_id_empresa');
+                            $ruc = $get('ruc');
+
+                            if (empty($lineasNegocioIds)) {
+                                return;
+                            }
+
+                            $seleccionados = [];
+
+                            $empresas = Empresa::whereIn('linea_negocio_id', $lineasNegocioIds)
+                                ->where('status_conexion', true)
+                                ->get();
+
+                            foreach ($empresas as $empresa) {
+                                $connectionName = self::getExternalConnectionName($empresa->id);
+                                if (!$connectionName) {
+                                    continue;
+                                }
+
+                                try {
+                                    $externalEmpresas = DB::connection($connectionName)
+                                        ->table('saeempr')
+                                        ->get();
+
+                                    foreach ($externalEmpresas as $data_empresa) {
+                                        $optionKey = $empresa->id . '-' . trim($data_empresa->empr_cod_empr);
+
+                                        $existeProveedor = DB::connection($connectionName)
+                                            ->table('saeclpv')
+                                            ->where('clpv_cod_empr', $amdgIdEmpresaCode)
+                                            ->where('clpv_ruc_clpv', $ruc)
+                                            ->where('clpv_clopv_clpv', 'PV')
+                                            ->exists();
+
+                                        if ($existeProveedor) {
+                                            $seleccionados[] = $optionKey;
+                                        }
+                                    }
+                                } catch (\Exception $e) {
+                                    \Log::error("Error en conexión externa empresa {$empresa->id}: " . $e->getMessage());
+                                    continue;
+                                }
+                            }
+
+                            $set('empresas_proveedor', $seleccionados);
+                        })
+                        ->columns(2),
+                ])
+                ->columns(1),
+        ]);
+    }
+
+    private static function getProductoModalWizard(): Wizard
+    {
+        return Wizard::make([
+            Step::make('Información principal')
+                ->schema([
+                    Forms\Components\Hidden::make('id_empresa')->required(),
+                    Forms\Components\Hidden::make('amdg_id_empresa')->required(),
+                    Forms\Components\Hidden::make('amdg_id_sucursal')->required(),
+                    Forms\Components\Select::make('linea')
+                        ->label('Línea')
+                        ->options(function (Get $get) {
+                            $empresaId = $get('id_empresa');
+                            $amdgIdEmpresaCode = $get('amdg_id_empresa');
+
+                            if (!$empresaId || !$amdgIdEmpresaCode) {
+                                return [];
+                            }
+
+                            $connectionName = self::getExternalConnectionName($empresaId);
+                            if (!$connectionName) {
+                                return [];
+                            }
+
+                            try {
+                                return DB::connection($connectionName)
+                                    ->table('saelinp')
+                                    ->where('linp_cod_empr', $amdgIdEmpresaCode)
+                                    ->pluck('linp_des_linp', 'linp_cod_linp')
+                                    ->all();
+                            } catch (\Exception $e) {
+                                return [];
+                            }
+                        })
+                        ->searchable()
+                        ->live()
+                        ->required(),
+                    Forms\Components\Select::make('grupo')
+                        ->label('Grupo')
+                        ->options(function (Get $get) {
+                            $empresaId = $get('id_empresa');
+                            $lineaCode = $get('linea');
+                            $amdgIdEmpresaCode = $get('amdg_id_empresa');
+
+                            if (!$empresaId || !$lineaCode || !$amdgIdEmpresaCode) {
+                                return [];
+                            }
+
+                            $connectionName = self::getExternalConnectionName($empresaId);
+                            if (!$connectionName) {
+                                return [];
+                            }
+
+                            try {
+                                return DB::connection($connectionName)
+                                    ->table('saegrpr')
+                                    ->where('grpr_cod_linp', $lineaCode)
+                                    ->where('grpr_cod_empr', $amdgIdEmpresaCode)
+                                    ->pluck('grpr_des_grpr', 'grpr_cod_grpr')
+                                    ->all();
+                            } catch (\Exception $e) {
+                                return [];
+                            }
+                        })
+                        ->searchable()
+                        ->live()
+                        ->required(),
+                    Forms\Components\Select::make('categoria')
+                        ->label('Categoria')
+                        ->options(function (Get $get) {
+                            $empresaId = $get('id_empresa');
+                            $grupoCode = $get('grupo');
+                            $amdgIdEmpresaCode = $get('amdg_id_empresa');
+
+                            if (!$empresaId || !$grupoCode || !$amdgIdEmpresaCode) {
+                                return [];
+                            }
+
+                            $connectionName = self::getExternalConnectionName($empresaId);
+                            if (!$connectionName) {
+                                return [];
+                            }
+
+                            try {
+                                return DB::connection($connectionName)
+                                    ->table('saecate')
+                                    ->where('cate_cod_grpr', $grupoCode)
+                                    ->where('cate_cod_empr', $amdgIdEmpresaCode)
+                                    ->pluck('cate_nom_cate', 'cate_cod_cate')
+                                    ->all();
+                            } catch (\Exception $e) {
+                                return [];
+                            }
+                        })
+                        ->searchable()
+                        ->live()
+                        ->required(),
+                    Forms\Components\Select::make('marca')
+                        ->label('Marca')
+                        ->options(function (Get $get) {
+                            $empresaId = $get('id_empresa');
+                            $categoriaCode = $get('categoria');
+                            $amdgIdEmpresaCode = $get('amdg_id_empresa');
+
+                            if (!$empresaId || !$categoriaCode || !$amdgIdEmpresaCode) {
+                                return [];
+                            }
+
+                            $connectionName = self::getExternalConnectionName($empresaId);
+                            if (!$connectionName) {
+                                return [];
+                            }
+
+                            try {
+                                return DB::connection($connectionName)
+                                    ->table('saemarc')
+                                    ->where('marc_cod_cate', $categoriaCode)
+                                    ->where('marc_cod_empr', $amdgIdEmpresaCode)
+                                    ->pluck('marc_des_marc', 'marc_cod_marc')
+                                    ->all();
+                            } catch (\Exception $e) {
+                                return [];
+                            }
+                        })
+                        ->searchable()
+                        ->required(),
+                    Actions::make([
+                        Action::make('search_inventory_tree_action')
+                            ->label('Buscar Árbol Inventario')
+                            ->disabled(fn(Get $get) => !$get('amdg_id_empresa'))
+                            ->mountUsing(function ($form, Get $get) {
+                                $form->fill([
+                                    'id_empresa' => $get('id_empresa'),
+                                    'amdg_id_empresa' => $get('amdg_id_empresa'),
+                                ]);
+                            })
+                            ->action(function () {
+                                // La lógica principal se manejará en el frontend con AlpineJS
+                            })
+                            ->form([
+                                Forms\Components\TextInput::make('search_term')
+                                    ->label('Buscar Coincidencia')
+                                    ->live(debounce: '500ms')
+                                    ->extraAttributes(['wire:keydown.enter.prevent' => ''])
+                                    ->autofocus(),
+                                Forms\Components\Hidden::make('id_empresa'),
+                                Forms\Components\Hidden::make('amdg_id_empresa'),
+                                View::make('filament.hooks.set-product-tree-values'),
+                                Forms\Components\Placeholder::make('search_results')
+                                    ->disableLabel()
+                                    ->content(function (Get $get) {
+                                        $empresaId = $get('id_empresa');
+                                        $amdgIdEmpresaCode = $get('amdg_id_empresa');
+                                        $searchTerm = $get('search_term');
+
+                                        if (!$empresaId || !$amdgIdEmpresaCode) {
+                                            return 'Seleccione una empresa antes de buscar.';
+                                        }
+                                        if (!$searchTerm) {
+                                            return 'Ingrese un término de búsqueda.';
+                                        }
+
+                                        try {
+                                            $connectionName = self::getExternalConnectionName($empresaId);
+                                            if (!$connectionName) {
+                                                return 'Error de conexión.';
+                                            }
+
+                                            $searchTermUpper = strtoupper($searchTerm);
+                                            $results = DB::connection($connectionName)
+                                                ->table('saelinp as l')
+                                                ->leftJoin('saegrpr as g', function ($join) use ($amdgIdEmpresaCode) {
+                                                    $join->on('l.linp_cod_linp', '=', 'g.grpr_cod_linp')
+                                                        ->where('g.grpr_cod_empr', '=', $amdgIdEmpresaCode);
+                                                })
+                                                ->leftJoin('saecate as c', function ($join) use ($amdgIdEmpresaCode) {
+                                                    $join->on('g.grpr_cod_grpr', '=', 'c.cate_cod_grpr')
+                                                        ->where('c.cate_cod_empr', '=', $amdgIdEmpresaCode);
+                                                })
+                                                ->leftJoin('saemarc as m', function ($join) use ($amdgIdEmpresaCode) {
+                                                    $join->on('c.cate_cod_cate', '=', 'm.marc_cod_cate')
+                                                        ->where('m.marc_cod_empr', '=', $amdgIdEmpresaCode);
+                                                })
+                                                ->select(
+                                                    'l.linp_cod_linp',
+                                                    'l.linp_des_linp',
+                                                    'g.grpr_cod_grpr',
+                                                    'g.grpr_des_grpr',
+                                                    'c.cate_cod_cate',
+                                                    'c.cate_nom_cate',
+                                                    'm.marc_cod_marc',
+                                                    'm.marc_des_marc'
+                                                )
+                                                ->where('l.linp_cod_empr', $amdgIdEmpresaCode)
+                                                ->where(function ($query) use ($searchTermUpper) {
+                                                    $query->whereRaw('UPPER(l.linp_des_linp) LIKE ?', ["%{$searchTermUpper}%"])
+                                                        ->orWhereRaw('UPPER(g.grpr_des_grpr) LIKE ?', ["%{$searchTermUpper}%"])
+                                                        ->orWhereRaw('UPPER(c.cate_nom_cate) LIKE ?', ["%{$searchTermUpper}%"])
+                                                        ->orWhereRaw('UPPER(m.marc_des_marc) LIKE ?', ["%{$searchTermUpper}%"]);
+                                                })
+                                                ->distinct()
+                                                ->limit(50)
+                                                ->get();
+
+                                            if ($results->isEmpty()) {
+                                                return 'No se encontraron resultados.';
+                                            }
+
+                                            $tableHtml = '<table class="w-full text-sm text-left rtl:text-right text-gray-500 dark:text-gray-400">';
+                                            $tableHtml .= '<thead class="text-xs text-gray-700 uppercase bg-gray-50 dark:bg-gray-700 dark:text-gray-400"><tr>';
+                                            $tableHtml .= '<th scope="col" class="px-6 py-3">Línea</th><th scope="col" class="px-6 py-3">Grupo</th><th scope="col" class="px-6 py-3">Categoría</th><th scope="col" class="px-6 py-3">Marca</th><th scope="col" class="px-6 py-3">Acción</th>';
+                                            $tableHtml .= '</tr></thead><tbody>';
+
+                                            foreach ($results as $row) {
+                                                $data = htmlspecialchars(json_encode([
+                                                    'linea' => trim($row->linp_cod_linp ?? ''),
+                                                    'grupo' => trim($row->grpr_cod_grpr ?? ''),
+                                                    'categoria' => trim($row->cate_cod_cate ?? ''),
+                                                    'marca' => trim($row->marc_cod_marc ?? ''),
+                                                ]), ENT_QUOTES, 'UTF-8');
+
+                                                $tableHtml .= '<tr class="bg-white border-b dark:bg-gray-800 dark:border-gray-700">';
+                                                $tableHtml .= '<td class="px-6 py-4">' . ($row->linp_des_linp ?? '') . '</td>';
+                                                $tableHtml .= '<td class="px-6 py-4">' . ($row->grpr_des_grpr ?? '') . '</td>';
+                                                $tableHtml .= '<td class="px-6 py-4">' . ($row->cate_nom_cate ?? '') . '</td>';
+                                                $tableHtml .= '<td class="px-6 py-4">' . ($row->marc_des_marc ?? '') . '</td>';
+                                                $tableHtml .= '<td class="px-6 py-4"><button type="button" x-on:click.prevent="$dispatch(\'fill-from-tree\', { data: ' . $data . ' });close()" class="filament-button filament-button-size-sm inline-flex items-center justify-center py-1 gap-1 font-medium rounded-lg border transition-colors focus:outline-none focus:ring-offset-2 focus:ring-2 focus:ring-inset dark:focus:ring-offset-0 min-h-[2rem] px-3 text-sm text-white shadow focus:ring-white border-transparent bg-primary-600 hover:bg-primary-500 focus:bg-primary-700 focus:ring-offset-primary-700">Seleccionar</button></td>';
+                                                $tableHtml .= '</tr>';
+                                            }
+
+                                            $tableHtml .= '</tbody></table>';
+                                            return new HtmlString($tableHtml);
+                                        } catch (\Exception $e) {
+                                            \Log::error('Error en búsqueda de árbol de inventario: ' . $e->getMessage());
+                                            return 'Error al realizar la búsqueda.';
+                                        }
+                                    }),
+                            ])
+                            ->modalWidth('4xl')
+                            ->modalHeading('Buscar en Árbol de Inventario'),
+                    ]),
+                ])
+                ->columns(2),
+            Step::make('Información Producto')
+                ->schema([
+                    Forms\Components\TextInput::make('sku')
+                        ->label('SKU')
+                        ->required()
+                        ->unique(ignoreRecord: true)
+                        ->maxLength(255),
+                    Forms\Components\TextInput::make('nombre')
+                        ->required()
+                        ->maxLength(255),
+                    Forms\Components\Textarea::make('detalle')
+                        ->label('Detalle')
+                        ->rows(3)
+                        ->maxLength(65535)
+                        ->columnSpanFull(),
+                    Forms\Components\Select::make('tipo')
+                        ->label('Tipo')
+                        ->required()
+                        ->options([
+                            1 => 'Servicio',
+                            2 => 'Producto',
+                        ])
+                        ->default(2),
+                    Forms\Components\Select::make('id_unidad_medida')
+                        ->label('Unidad de Medida')
+                        ->relationship('unidadMedida', 'nombre')
+                        ->required()
+                        ->searchable()
+                        ->preload(),
+                    Forms\Components\TextInput::make('stock_minimo')
+                        ->label('Stock Mínimo')
+                        ->numeric()
+                        ->default(0)
+                        ->required(),
+                    Forms\Components\TextInput::make('stock_maximo')
+                        ->label('Stock Máximo')
+                        ->numeric()
+                        ->default(0)
+                        ->required(),
+                    Forms\Components\Checkbox::make('iva_sn')
+                        ->label('¿Aplica IVA?')
+                        ->default(false),
+                    Forms\Components\TextInput::make('porcentaje_iva')
+                        ->label('Porcentaje IVA (%)')
+                        ->numeric()
+                        ->default(0)
+                        ->required(),
+                    Forms\Components\Select::make('lineasNegocio')
+                        ->label('Líneas de Negocio')
+                        ->relationship('lineasNegocio', 'nombre')
+                        ->multiple()
+                        ->preload()
+                        ->searchable()
+                        ->live()
+                        ->required(),
+                ])
+                ->columns(2),
+            Step::make('Sucursales y Bodegas Externas')
+                ->schema([
+                    Forms\Components\CheckboxList::make('bodegas')
+                        ->label('Bodegas para replicar')
+                        ->options(function (Get $get) {
+                            $lineasNegocioIds = $get('lineasNegocio');
+                            if (empty($lineasNegocioIds)) {
+                                return [];
+                            }
+
+                            $empresas = Empresa::whereIn('linea_negocio_id', $lineasNegocioIds)
+                                ->where('status_conexion', true)->get();
+
+                            $bodegasOptions = [];
+
+                            foreach ($empresas as $empresa) {
+                                $connectionName = self::getExternalConnectionName($empresa->id);
+                                if (!$connectionName) {
+                                    continue;
+                                }
+
+                                try {
+                                    $externalBodegas = DB::connection($connectionName)
+                                        ->table('saebode as b')
+                                        ->join('saesubo as sb', 'b.bode_cod_bode', '=', 'sb.subo_cod_bode')
+                                        ->join('saesucu as s', 'sb.subo_cod_sucu', '=', 's.sucu_cod_sucu')
+                                        ->select('b.bode_cod_bode', 'b.bode_nom_bode', 's.sucu_nom_sucu')
+                                        ->get();
+
+                                    foreach ($externalBodegas as $bodega) {
+                                        $optionKey = $empresa->id . '-' . trim($bodega->bode_cod_bode);
+                                        $optionLabel = $empresa->nombre_empresa . ' - ' . $bodega->sucu_nom_sucu . ' - ' . $bodega->bode_nom_bode;
+                                        $bodegasOptions[$optionKey] = $optionLabel;
+                                    }
+                                } catch (\Exception $e) {
+                                    \Log::error('Error al conectar con la base de datos externa para la empresa ID ' . $empresa->id . ': ' . $e->getMessage());
+                                    continue;
+                                }
+                            }
+
+                            return $bodegasOptions;
+                        })
+                        ->afterStateHydrated(function (Get $get, callable $set) {
+                            $lineasNegocioIds = $get('lineasNegocio');
+                            $sku = $get('sku');
+
+                            if (empty($lineasNegocioIds)) {
+                                return;
+                            }
+
+                            $seleccionados = [];
+
+                            $empresas = Empresa::whereIn('linea_negocio_id', $lineasNegocioIds)
+                                ->where('status_conexion', true)
+                                ->get();
+
+                            foreach ($empresas as $empresa) {
+                                $connectionName = self::getExternalConnectionName($empresa->id);
+                                if (!$connectionName) {
+                                    continue;
+                                }
+
+                                try {
+                                    $externalBodegas = DB::connection($connectionName)
+                                        ->table('saebode as b')
+                                        ->join('saesubo as sb', 'b.bode_cod_bode', '=', 'sb.subo_cod_bode')
+                                        ->join('saesucu as s', 'sb.subo_cod_sucu', '=', 's.sucu_cod_sucu')
+                                        ->select('b.bode_cod_bode', 'b.bode_nom_bode', 's.sucu_nom_sucu', 's.sucu_cod_empr')
+                                        ->get();
+
+                                    foreach ($externalBodegas as $bodega) {
+                                        $optionKey = $empresa->id . '-' . trim($bodega->bode_cod_bode);
+
+                                        $existeProdBode = DB::connection($connectionName)
+                                            ->table('saeprbo')
+                                            ->where('prbo_cod_empr', $bodega->sucu_cod_empr)
+                                            ->where('prbo_cod_bode', trim($bodega->bode_cod_bode))
+                                            ->where('prbo_cod_prod', $sku)
+                                            ->exists();
+
+                                        if ($existeProdBode) {
+                                            $seleccionados[] = $optionKey;
+                                        }
+                                    }
+                                } catch (\Exception $e) {
+                                    \Log::error("Error en conexión externa empresa {$empresa->id}: " . $e->getMessage());
+                                    continue;
+                                }
+                            }
+
+                            $set('bodegas', $seleccionados);
+                        })
+                        ->columns(2),
+                ])
+                ->columns(1),
+        ]);
     }
 
     public static function table(Table $table): Table
