@@ -323,6 +323,13 @@ class OrdenCompraResource extends Resource
                                             'admg_id_sucursal' => $get('amdg_id_sucursal'),
                                         ]);
                                     })
+                                    ->mutateFormDataUsing(function (array $data, Get $get): array {
+                                        $data['id_empresa'] = $get('id_empresa') ?? $data['id_empresa'] ?? null;
+                                        $data['admg_id_empresa'] = $get('amdg_id_empresa') ?? $data['admg_id_empresa'] ?? null;
+                                        $data['admg_id_sucursal'] = $get('amdg_id_sucursal') ?? $data['admg_id_sucursal'] ?? null;
+
+                                        return $data;
+                                    })
                                     ->action(function (array $data, Set $set, Get $get): void {
                                         $record = Proveedores::create($data);
                                         $lineasNegocioIds = $data['lineasNegocio'] ?? [];
@@ -508,6 +515,13 @@ class OrdenCompraResource extends Resource
                                     'amdg_id_empresa' => $get('amdg_id_empresa'),
                                     'amdg_id_sucursal' => $get('amdg_id_sucursal'),
                                 ]);
+                            })
+                            ->mutateFormDataUsing(function (array $data, Get $get): array {
+                                $data['id_empresa'] = $get('id_empresa') ?? $data['id_empresa'] ?? null;
+                                $data['amdg_id_empresa'] = $get('amdg_id_empresa') ?? $data['amdg_id_empresa'] ?? null;
+                                $data['amdg_id_sucursal'] = $get('amdg_id_sucursal') ?? $data['amdg_id_sucursal'] ?? null;
+
+                                return $data;
                             })
                             ->action(function (array $data): void {
                                 $record = Producto::create($data);
