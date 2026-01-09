@@ -174,7 +174,8 @@ class OrdenCompraSyncService
                 'minv_cod_tran' => $tran_cod_tran,
                 'minv_cod_modu' => 10,
                 'minv_cod_empl' => $empleado,
-                'minv_cod_ftrn' => $defi_for_defi,
+               'minv_cod_ftrn' => is_numeric($defi_for_defi) ? (int)$defi_for_defi : null,
+
                 'minv_fmov' => $fecha_pedido,
                 'minv_dege_minv' => 0,
                 'minv_cod_usua' => $id_usuario,
