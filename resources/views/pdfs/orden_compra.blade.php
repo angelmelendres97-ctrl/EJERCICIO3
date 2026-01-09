@@ -22,7 +22,7 @@
             width: 100%;
             max-width: 1000px;
             margin: 0 auto;
-            /* Deja espacio para el footer fijo (pol�ticas + firmas) */
+            /* Deja espacio para el footer fijo (políticas + firmas) */
             padding: 0px 0px 260px;
             position: relative;
         }
@@ -92,12 +92,11 @@
             width: 100%;
             border-collapse: collapse;
             margin-top: 25px;
-            /* m�s espacio arriba */
+            /* más espacio arriba */
             margin-bottom: 25px;
-            /* m�s espacio abajo */
+            /* más espacio abajo */
             font-size: 13px;
         }
-
 
         table th,
         table td {
@@ -208,7 +207,7 @@
             font-size: 11px;
         }
 
-        /* Firmas: SIN �marco contenedor� */
+        /* Firmas: SIN “marco contenedor” */
         .signatures {
             margin-top: 40px;
         }
@@ -228,7 +227,7 @@
             width: 50%;
             text-align: center;
             padding-top: 55px;
-            /* ? M�S ESPACIO PARA FIRMAR */
+            /* MÁS ESPACIO PARA FIRMAR */
         }
 
         .sign-line {
@@ -256,8 +255,6 @@
             margin-top: 30px;
             margin-bottom: 30px;
         }
-
-        /* ===== FIRMAS FIJAS ABAJO ===== */
     </style>
 </head>
 
@@ -267,7 +264,7 @@
         <div class="stamp">{{ $ordenCompra->presupuesto }}</div>
 
         <div class="header-block">
-            <div class="title-main">{{ $ordenCompra->empresa->nombre_empresa }}</div>
+            <div class="title-main">{{ $nombreEmpresaTitulo ?? 'Nombre de Empresa no disponible' }}</div>
             <div class="title-sub">ORDEN DE COMPRA N° {{ str_pad($ordenCompra->id, 8, '0', STR_PAD_LEFT) }}</div>
 
             @php
@@ -283,11 +280,11 @@
             <div class="col-7">
                 <div class="flex">
                     <div class="left-info">
-                        <b>Ciudad y Fecha: </b> MACHALA {{ $ordenCompra->fecha_pedido->format('d/m/Y') }}<br>
+                        <b>Ciudad y fecha: </b> MACHALA {{ $ordenCompra->fecha_pedido->format('d/m/Y') }}<br>
                         <b>Proveedor: </b> {{ $ordenCompra->proveedor }}<br>
-                        <b>Para Uso De: </b> {{ $ordenCompra->uso_compra }}<br>
-                        <b>Solicitado Por: </b> {{ $ordenCompra->solicitado_por }}<br>
-                        <b>Lugar de Entrega: </b> IMBUESA<br>
+                        <b>Para uso de: </b> {{ $ordenCompra->uso_compra }}<br>
+                        <b>Solicitado por: </b> {{ $ordenCompra->solicitado_por }}<br>
+                        <b>Lugar de entrega: </b> IMBUESA<br>
                     </div>
                 </div>
             </div>
@@ -295,10 +292,10 @@
             <div class="col-5">
                 <div class="flex">
                     <div class="left-info">
-                        <b>Plazo de Entrega: </b> {{ $ordenCompra->fecha_entrega->format('d/m/Y') }}<br>
-                        <b>Direccion: </b> {{ $ordenCompra->direccion ?? '' }}<br>
-                        <b>Telefono: </b> {{ $ordenCompra->telefono ?? '0998612034' }}<br>
-                        <b>Forma de Pago: </b> {{ $ordenCompra->forma_pago ?? '' }}<br>
+                        <b>Plazo de entrega: </b> {{ $ordenCompra->fecha_entrega->format('d/m/Y') }}<br>
+                        <b>Dirección: </b> {{ $ordenCompra->direccion ?? '' }}<br>
+                        <b>Teléfono: </b> {{ $ordenCompra->telefono ?? '0998612034' }}<br>
+                        <b>Forma de pago: </b> {{ $ordenCompra->forma_pago ?? '' }}<br>
                     </div>
                 </div>
             </div>
@@ -311,8 +308,8 @@
             <thead>
                 <tr>
                     <th style="width:20px">#</th>
-                    <th style="width:100px">C�digo</th>
-                    <th>Descripci�n</th>
+                    <th style="width:100px">Código</th>
+                    <th>Descripción</th>
                     <th style="width:40px">Unid.</th>
                     <th style="width:60px">Cant.</th>
                     <th style="width:60px">Precio U.</th>
@@ -344,7 +341,7 @@
             } elseif ($ordenCompra->tipo_oc == 'PAGO') {
                 $nombre_tipo_oc = 'PAGO';
             } elseif ($ordenCompra->tipo_oc == 'REGUL') {
-                $nombre_tipo_oc = 'REGULARIZACION';
+                $nombre_tipo_oc = 'REGULARIZACIÓN';
             } elseif ($ordenCompra->tipo_oc == 'CAJAC') {
                 $nombre_tipo_oc = 'CAJA CHICA';
             }
@@ -365,6 +362,32 @@
             }
         @endphp
 
+        @php
+            // Agrupa bases e IVA por porcentaje (solo si existen en detalles)
+            $basePorIva = [];
+            $ivaPorIva = [];
+
+            foreach ($ordenCompra->detalles as $d) {
+                // Ajusta el nombre del campo si en tu detalle se llama distinto:
+                // impuesto / iva / porcentaje_iva, etc.
+                $rate = floatval($d->impuesto ?? 0);
+
+                $cantidad = floatval($d->cantidad ?? 0);
+                $costo = floatval($d->costo ?? 0);
+
+                $base = $cantidad * $costo;
+
+                $basePorIva[$rate] = ($basePorIva[$rate] ?? 0) + $base;
+                $ivaPorIva[$rate] = ($ivaPorIva[$rate] ?? 0) + $base * ($rate / 100);
+            }
+
+            ksort($basePorIva, SORT_NUMERIC);
+            $totalImpuestosCalc = array_sum($ivaPorIva);
+
+            // Formato bonito para mostrar 0, 5, 15, 18 (sin .00)
+            $fmtRate = fn($r) => rtrim(rtrim(number_format((float) $r, 2, '.', ''), '0'), '.');
+        @endphp
+
         <!-- RESUMEN (OBS + MINI INFO + TOTALES) -->
         <table class="resume-wrap">
             <tr>
@@ -377,20 +400,19 @@
 
                     <table class="mini-info">
                         <tr>
-                            <th>Tipo Orden Compra</th>
+                            <th>Tipo de orden de compra</th>
                             <td>{{ $nombre_tipo_oc }}</td>
                         </tr>
 
                         @if ($ordenCompra->tipo_oc == 'REEMB')
                             <tr>
-                                <th>Nombre reembolso</th>
+                                <th>Nombre del reembolso</th>
                                 <td>{{ $ordenCompra->nombre_reembolso ?? '' }}</td>
                             </tr>
                         @endif
 
-                      
                         <tr>
-                            <th>Numeros de pedido</th>
+                            <th>Números de pedido</th>
                             <td>{{ $txt_pedidos }}</td>
                         </tr>
                     </table>
@@ -403,19 +425,40 @@
                             <th style="width:60%" class="left">Subtotal</th>
                             <td style="width:40%" class="right">$ {{ number_format($ordenCompra->subtotal, 2) }}</td>
                         </tr>
+
                         <tr>
                             <th class="left">Descuento</th>
                             <td class="right">$ {{ number_format($ordenCompra->total_descuento, 2) }}</td>
                         </tr>
+
+                        {{-- Filas dinámicas por IVA (solo si existen ítems con ese porcentaje) --}}
+                        @foreach ($basePorIva as $rate => $base)
+                            @if (round($base, 6) > 0)
+                                <tr>
+                                    <th class="left">Subtotal IVA {{ $fmtRate($rate) }}%</th>
+                                    <td class="right">$ {{ number_format($base, 2) }}</td>
+                                </tr>
+                                <tr>
+                                    <th class="left">IVA {{ $fmtRate($rate) }}%</th>
+                                    <td class="right">$ {{ number_format($ivaPorIva[$rate] ?? 0, 2) }}</td>
+                                </tr>
+                            @endif
+                        @endforeach
+
+                        {{-- Total impuestos (si quieres mantener la fila “IVA” general) --}}
                         <tr>
-                            <th class="left">Iva</th>
-                            <td class="right">$ {{ number_format($ordenCompra->total_impuesto, 2) }}</td>
+                            <th class="left">IVA</th>
+                            <td class="right">
+                                $ {{ number_format($ordenCompra->total_impuesto ?? $totalImpuestosCalc, 2) }}
+                            </td>
                         </tr>
+
                         <tr>
                             <th class="left">Total</th>
                             <td class="right">$ {{ number_format($ordenCompra->total, 2) }}</td>
                         </tr>
                     </table>
+
                 </td>
             </tr>
         </table>
@@ -426,22 +469,20 @@
                 $empresaNombre = $ordenCompra->empresa->nombre_empresa ?? 'LA EMPRESA';
                 $empresaNombreUpper = mb_strtoupper($empresaNombre, 'UTF-8');
             @endphp
+
             <div class="policies">
-                <b>POL�TICAS PARA LA ORDEN DE COMPRA:</b><br>
-                A) Este documento es v�lido solamente si est� firmado por la persona autorizada para aprobar
+                <b>POLÍTICAS PARA LA ORDEN DE COMPRA:</b><br>
+                A) Este documento es válido solamente si está firmado por la persona autorizada para aprobar
                 compras.<br>
-                B) El proveedor sera responsable de revisar los precios establecidos en la presente orden de compra,
-                esten acorde a los cotizados. Y no podran variar segun el tiempo de vigencia establecido en la
-                cotizacion<br>
-                C) El Proveedor sera responsable de cumplir con las especificaciones y el tiempo ofrecido y acordado con
-                <b>{{ $empresaNombreUpper }}</b>. En caso de modificar las especificaciones deberar informar a
-                <b>{{ $empresaNombreUpper }}</b> para que esta resuelva si aprueba o no tal modificacion<br>
-
-                D) El caso de inclumpliento de tiempos de entrega, <b>{{ $empresaNombreUpper }}</b> decidira si aceptar
-                o no
-                el pedido, y en caso de recibirlo podra multar al proveedor, escontando costos de afectacion por la no
-                recepcion de la mercaderia en la fecha acordada<br>
-
+                B) El proveedor será responsable de revisar los precios establecidos en la presente orden de compra,
+                que estén acordes a los cotizados, y no podrán variar según el tiempo de vigencia establecido en la
+                cotización.<br>
+                C) El proveedor será responsable de cumplir con las especificaciones y el tiempo ofrecido y acordado con
+                <b>{{ $empresaNombreUpper }}</b>. En caso de modificar las especificaciones, deberá informar a
+                <b>{{ $empresaNombreUpper }}</b> para que esta resuelva si aprueba o no tal modificación.<br>
+                D) En caso de incumplimiento de los tiempos de entrega, <b>{{ $empresaNombreUpper }}</b> decidirá si
+                acepta o no el pedido y, en caso de recibirlo, podrá multar al proveedor, descontando costos de afectación
+                por la no recepción de la mercadería en la fecha acordada.<br>
             </div>
 
             <div class="signatures">

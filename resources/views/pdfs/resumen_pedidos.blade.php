@@ -25,7 +25,8 @@
 
         .header-date {
             text-align: right;
-            margin-bottom: 10px;
+            margin-bottom: 5px;
+            margin-top: 20px
         }
 
         .header-date .title-sub {
@@ -260,7 +261,7 @@
                     <th style="width:35px">Proveedor</th>
                     <th style="width:20px">Detalle</th>
                     <th style="width:15px">Pedido</th>
-                    <th style="width:12px">Num. Factura o Proforma</th>
+                    <th style="width:12px">N°. Factura o Proforma</th>
                     <th style="width:12px">Orden Compra</th>
                     <th style="width:5px">Total</th>
                 </tr>
@@ -338,17 +339,16 @@
 
                     <td class="sign-cell">
                         <div class="sign-line"></div>
-                        <div class="sign-label"><b>REVISADO</b></div>
+                        <div class="sign-label"><b>REVISADO POR</b></div>
                     </td>
                     <td class="sign-cell">
                         <div class="sign-line"></div>
-                        <div class="sign-label"><b>REVISADO</b></div>
-                        <div class="sign-role"><b>DR. ZMG</b></div>
+                        <div class="sign-label"><b>AUTORIZADO POR</b></div>
                     </td>
 
                     <td class="sign-cell">
                         <div class="sign-line"></div>
-                        <div class="sign-label"><b>RECIBIDO</b></div>
+                        <div class="sign-label"><b>RECIBIDO POR</b></div>
                     </td>
 
 
@@ -358,13 +358,7 @@
 
     </div>
 
-    <!-- FOOTER FIJO que se repetir� en cada p�gina -->
-    <div class="pdf-footer" aria-hidden="true">
-        <!-- Si su generador soporta counter(pages) se mostrar� "P�g X / Y" -->
-        <span class="pagenum"></span>
-        <!-- Si no, puede usar la alternativa (solo n�mero de p�gina) -->
-        <span style="display:none" class="pagenum-alt"></span>
-    </div>
+    
 
 </body>
 

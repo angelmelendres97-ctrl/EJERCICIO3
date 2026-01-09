@@ -375,7 +375,8 @@ class OrdenCompraResource extends Resource
                                         ])
                                         ->groupBy('t.tran_des_tran', 'transaccion_etiqueta')
                                         ->orderBy('transaccion_etiqueta', 'asc')
-                                        ->pluck('transaccion_etiqueta', 't.tran_des_tran')
+                                        ->pluck('transaccion_etiqueta', 't.tran_cod_tran')
+
                                         ->all();
                                 } catch (\Exception $e) {
                                     return [];
