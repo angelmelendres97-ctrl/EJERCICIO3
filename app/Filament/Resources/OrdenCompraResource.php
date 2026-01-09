@@ -260,11 +260,13 @@ class OrdenCompraResource extends Resource
                                     })
                                     ->mountUsing(function (Action $action): void {
                                         $data = data_get($action->getLivewire(), 'data', []);
+                                        $prefillConexion = !empty($data['id_empresa']) && !empty($data['amdg_id_empresa']) && !empty($data['amdg_id_sucursal']);
 
                                         $action->fillForm([
                                             'id_empresa' => $data['id_empresa'] ?? null,
                                             'admg_id_empresa' => $data['amdg_id_empresa'] ?? null,
                                             'admg_id_sucursal' => $data['amdg_id_sucursal'] ?? null,
+                                            'prefill_conexion' => $prefillConexion,
                                         ]);
                                     })
                                     ->action(function (array $data, Set $set, Get $get): void {
@@ -448,11 +450,13 @@ class OrdenCompraResource extends Resource
                             })
                             ->mountUsing(function (Action $action): void {
                                 $data = data_get($action->getLivewire(), 'data', []);
+                                $prefillConexion = !empty($data['id_empresa']) && !empty($data['amdg_id_empresa']) && !empty($data['amdg_id_sucursal']);
 
                                 $action->fillForm([
                                     'id_empresa' => $data['id_empresa'] ?? null,
                                     'amdg_id_empresa' => $data['amdg_id_empresa'] ?? null,
                                     'amdg_id_sucursal' => $data['amdg_id_sucursal'] ?? null,
+                                    'prefill_conexion' => $prefillConexion,
                                 ]);
                             })
                             ->action(function (array $data): void {
@@ -1056,18 +1060,24 @@ class OrdenCompraResource extends Resource
         return [
             Forms\Components\Section::make('Información General')
                 ->schema([
+                    Forms\Components\Hidden::make('prefill_conexion')
+                        ->dehydrated(false),
                     Forms\Components\Select::make('id_empresa')
                         ->label('Conexion')
                         ->relationship('empresa', 'nombre_empresa')
                         ->searchable()
                         ->preload()
                         ->live()
-                        ->afterStateUpdated(function (callable $set): void {
+                        ->afterStateUpdated(function (callable $set, Get $get): void {
+                            if ($get('prefill_conexion')) {
+                                return;
+                            }
                             $set('admg_id_empresa', null);
                             $set('admg_id_sucursal', null);
                             $set('lineasNegocio', []);
                             $set('empresas_proveedor', []);
                         })
+                        ->disabled(fn(Get $get) => $get('prefill_conexion'))
                         ->required(),
 
                     Forms\Components\Select::make('admg_id_empresa')
@@ -1077,10 +1087,14 @@ class OrdenCompraResource extends Resource
                         ->preload()
                         ->reactive()
                         ->live()
-                        ->afterStateUpdated(function (callable $set): void {
+                        ->afterStateUpdated(function (callable $set, Get $get): void {
+                            if ($get('prefill_conexion')) {
+                                return;
+                            }
                             $set('admg_id_sucursal', null);
                             $set('empresas_proveedor', []);
                         })
+                        ->disabled(fn(Get $get) => $get('prefill_conexion'))
                         ->required(),
 
                     Forms\Components\Select::make('admg_id_sucursal')
@@ -1095,6 +1109,7 @@ class OrdenCompraResource extends Resource
                         ->preload()
                         ->reactive()
                         ->live()
+                        ->disabled(fn(Get $get) => $get('prefill_conexion'))
                         ->required(),
 
                     Forms\Components\Select::make('tipo')
@@ -1503,13 +1518,18 @@ class OrdenCompraResource extends Resource
         return [
             Forms\Components\Section::make('Conexion e informacion principal')
                 ->schema([
+                    Forms\Components\Hidden::make('prefill_conexion')
+                        ->dehydrated(false),
                     Forms\Components\Select::make('id_empresa')
                         ->label('Conexion')
                         ->relationship('empresa', 'nombre_empresa')
                         ->searchable()
                         ->preload()
                         ->live()
-                        ->afterStateUpdated(function (callable $set): void {
+                        ->afterStateUpdated(function (callable $set, Get $get): void {
+                            if ($get('prefill_conexion')) {
+                                return;
+                            }
                             $set('amdg_id_empresa', null);
                             $set('amdg_id_sucursal', null);
                             $set('linea', null);
@@ -1517,6 +1537,7 @@ class OrdenCompraResource extends Resource
                             $set('categoria', null);
                             $set('marca', null);
                         })
+                        ->disabled(fn(Get $get) => $get('prefill_conexion'))
                         ->required(),
                     Forms\Components\Select::make('amdg_id_empresa')
                         ->label('Empresa')
@@ -1525,13 +1546,17 @@ class OrdenCompraResource extends Resource
                         ->preload()
                         ->reactive()
                         ->live()
-                        ->afterStateUpdated(function (callable $set): void {
+                        ->afterStateUpdated(function (callable $set, Get $get): void {
+                            if ($get('prefill_conexion')) {
+                                return;
+                            }
                             $set('amdg_id_sucursal', null);
                             $set('linea', null);
                             $set('grupo', null);
                             $set('categoria', null);
                             $set('marca', null);
                         })
+                        ->disabled(fn(Get $get) => $get('prefill_conexion'))
                         ->required(),
 
                     Forms\Components\Select::make('amdg_id_sucursal')
@@ -1546,6 +1571,7 @@ class OrdenCompraResource extends Resource
                         ->preload()
                         ->reactive()
                         ->live()
+                        ->disabled(fn(Get $get) => $get('prefill_conexion'))
                         ->required(),
                     Forms\Components\Select::make('linea')
                         ->label('Línea')
