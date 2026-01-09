@@ -136,6 +136,13 @@ class OrdenCompraResource extends Resource
 
                         Forms\Components\Select::make('amdg_id_sucursal')
                             ->label('Sucursal')
+                            /*  ->afterStateUpdated(function (Get $get) {
+                                dd([
+                                    'id_empresa' => $get('id_empresa'),
+                                    'amdg_id_empresa' => $get('amdg_id_empresa'),
+                                    'amdg_id_sucursal' => $get('amdg_id_sucursal'),
+                                ]);
+                            }) */
                             ->options(function (Get $get) {
                                 $empresaId = $get('id_empresa');
                                 $amdgIdEmpresaCode = $get('amdg_id_empresa');
@@ -301,18 +308,24 @@ class OrdenCompraResource extends Resource
                                             ])
                                             ->model(Proveedores::class);
                                     })
-                                    ->mountUsing(function (Action $action): void {
-                                        $data = data_get($action->getLivewire(), 'data', []);
-                                        $empresaId = $data['id_empresa'] ?? null;
-                                        $lineaNegocioId = $empresaId ? Empresa::find($empresaId)?->linea_negocio_id : null;
+                                    ->mountUsing(function (Form $form, Action $action): void {
 
-                                        $action->fillForm([
-                                            'id_empresa' => $data['id_empresa'] ?? null,
-                                            'admg_id_empresa' => $data['amdg_id_empresa'] ?? null,
+                                        // Estado REAL del formulario principal (Create/Edit OrdenCompra)
+                                        $data = data_get($action->getLivewire(), 'data', []);
+
+                                        $form->fill([
+                                            'id_empresa'       => $data['id_empresa'] ?? null,
+                                            'admg_id_empresa'  => $data['amdg_id_empresa'] ?? null,
                                             'admg_id_sucursal' => $data['amdg_id_sucursal'] ?? null,
-                                            'lineasNegocio' => $lineaNegocioId ? [$lineaNegocioId] : [],
                                         ]);
                                     })
+
+
+
+
+
+
+
                                     ->action(function (array $data, Set $set, Get $get): void {
                                         $record = Proveedores::create($data);
                                         $lineasNegocioIds = $data['lineasNegocio'] ?? [];
@@ -478,21 +491,22 @@ class OrdenCompraResource extends Resource
                             ->modalSubmitActionLabel('Registrar producto')
                             ->form(function (Form $form): Form {
                                 return $form
-                                    ->schema([
-                                        self::getProductoModalWizard(),
-                                    ])
+                                    ->schema([self::getProductoModalWizard()])
                                     ->model(Producto::class);
                             })
-                            ->mountUsing(function (Action $action): void {
+                            ->mountUsing(function (Form $form, Action $action): void {
+                                // Estado REAL del formulario principal (OrdenCompra)
                                 $data = data_get($action->getLivewire(), 'data', []);
+
                                 $empresaId = $data['id_empresa'] ?? null;
                                 $lineaNegocioId = $empresaId ? Empresa::find($empresaId)?->linea_negocio_id : null;
 
-                                $action->fillForm([
-                                    'id_empresa' => $data['id_empresa'] ?? null,
-                                    'amdg_id_empresa' => $data['amdg_id_empresa'] ?? null,
-                                    'amdg_id_sucursal' => $data['amdg_id_sucursal'] ?? null,
-                                    'lineasNegocio' => $lineaNegocioId ? [$lineaNegocioId] : [],
+                                // IMPORTANTE: llenar el FORM del modal
+                                $form->fill([
+                                    'id_empresa'        => $empresaId,
+                                    'amdg_id_empresa'   => $data['amdg_id_empresa'] ?? null,
+                                    'amdg_id_sucursal'  => $data['amdg_id_sucursal'] ?? null,
+                                    'lineasNegocio'     => $lineaNegocioId ? [$lineaNegocioId] : [],
                                 ]);
                             })
                             ->action(function (array $data, Set $set, Get $get): void {
@@ -1150,20 +1164,28 @@ class OrdenCompraResource extends Resource
             Step::make('Información General')
                 ->schema([
                     Forms\Components\Hidden::make('id_empresa')
-                        ->required()
+                        ->dehydrated()
                         ->live(),
+
                     Forms\Components\Hidden::make('admg_id_empresa')
-                        ->required()
+                        ->dehydrated()
                         ->live(),
+
                     Forms\Components\Hidden::make('admg_id_sucursal')
-                        ->required()
+                        ->dehydrated()
                         ->live(),
+
+
                     Forms\Components\Select::make('tipo')
                         ->label('Tipo Identificacion')
+                        ->reactive()
                         ->options(function (Get $get) {
                             $empresaId = $get('id_empresa');
                             $amdgIdEmpresaCode = $get('admg_id_empresa');
-
+                            /* dd('BUDGET', [f
+                                'id_empresa' => $get('id_empresa'),
+                                'admg_id_empresa' => $get('admg_id_empresa'),
+                            ]); */
                             if (!$empresaId || !$amdgIdEmpresaCode) {
                                 return [];
                             }
@@ -1582,6 +1604,11 @@ class OrdenCompraResource extends Resource
                         ->searchable()
                         ->preload()
                         ->live()
+                        ->afterStateUpdated(function (Set $set) {
+                            $set('grupo', null);
+                            $set('categoria', null);
+                            $set('marca', null);
+                        })
                         ->required(),
                     Forms\Components\Select::make('grupo')
                         ->label('Grupo')
@@ -1613,6 +1640,10 @@ class OrdenCompraResource extends Resource
                         ->searchable()
                         ->preload()
                         ->live()
+    ->afterStateUpdated(function (Set $set) {
+        $set('categoria', null);
+        $set('marca', null);
+    })
                         ->required(),
                     Forms\Components\Select::make('categoria')
                         ->label('Categoria')
@@ -1643,7 +1674,10 @@ class OrdenCompraResource extends Resource
                         })
                         ->searchable()
                         ->preload()
-                        ->live()
+                         ->live()
+    ->afterStateUpdated(function (Set $set) {
+        $set('marca', null);
+    })
                         ->required(),
                     Forms\Components\Select::make('marca')
                         ->label('Marca')

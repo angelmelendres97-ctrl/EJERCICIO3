@@ -131,12 +131,29 @@ class CreateOrdenCompra extends CreateRecord
             return 'aux-' . ($item->dped_det_dped ?? uniqid('', true));
         })->map(function ($group) {
             $first = $group->first();
+
             $cantidadPedida = $group->sum(fn($i) => (float) $i->dped_can_ped);
             $cantidadEntregada = $group->sum(fn($i) => (float) $i->dped_can_ent);
             $cantidadPendiente = $cantidadPedida - $cantidadEntregada;
+
             $esAuxiliar = !empty($first->dped_cod_auxiliar);
             $esServicio = $this->isServicioItem($first->dped_cod_prod ?? null);
             $codigoProducto = $first->dped_cod_prod ?? null;
+
+            // ✅ Prioridad estricta para auxiliares
+            $auxNombre = null;
+            if ($esAuxiliar) {
+                $auxNombre = $first->deped_prod_nom
+                    ?? $first->dped_det_dped
+                    ?? $first->dped_desc_axiliar
+                    ?? null;
+            } else {
+                // (si no es auxiliar, mantén lógica normal)
+                $auxNombre = $first->deped_prod_nom
+                    ?? $first->dped_desc_axiliar
+                    ?? $first->dped_det_dped
+                    ?? null;
+            }
 
             return (object) [
                 'dped_cod_prod' => $first->dped_cod_prod,
@@ -145,14 +162,15 @@ class CreateOrdenCompra extends CreateRecord
                 'es_auxiliar' => $esAuxiliar,
                 'es_servicio' => $esServicio,
                 'auxiliar_codigo' => $first->dped_cod_auxiliar ?? null,
-                'auxiliar_nombre' => $first->dped_det_dped
+
+                // ✅ aquí ya queda fijo para auxiliares
+                'auxiliar_nombre' => $auxNombre,
+
+                'servicio_nombre' => $first->deped_prod_nom
                     ?? $first->dped_desc_axiliar
-                    ?? $first->deped_prod_nom
+                    ?? $first->dped_det_dped
                     ?? null,
-                'servicio_nombre' => $first->dped_det_dped
-                    ?? $first->dped_desc_axiliar
-                    ?? $first->deped_prod_nom
-                    ?? null,
+
                 'codigo_producto_estandar' => $codigoProducto,
             ];
         })->where('cantidad_pendiente', '>', 0); // Filter out fully delivered items
@@ -192,14 +210,15 @@ class CreateOrdenCompra extends CreateRecord
                 $auxiliarData = null;
 
                 if ($detalle->es_auxiliar) {
+                    $nombreAux = $detalle->auxiliar_nombre;
                     $auxiliarDescripcion = trim(collect([
                         $detalle->auxiliar_codigo ? 'Código auxiliar: ' . $detalle->auxiliar_codigo : null,
-                        $detalle->auxiliar_nombre ? 'Descripción: ' . $detalle->auxiliar_nombre : null,
+                        $nombreAux ? $nombreAux : null,
                     ])->filter()->implode(' | '));
 
                     $auxiliarData = [
                         'codigo' => $detalle->auxiliar_codigo,
-                        'descripcion' => $detalle->auxiliar_nombre,
+                        'descripcion' => $nombreAux,
                     ];
                 }
 
@@ -213,13 +232,25 @@ class CreateOrdenCompra extends CreateRecord
                 }
 
                 return [
-                    'id_bodega' => $id_bodega_item, // Set the correct warehouse for this line
+                    'id_bodega' => $id_bodega_item,
+
+                    // ✅ si es auxiliar, normalmente no hay codigo_producto hasta que el usuario lo seleccione
                     'codigo_producto' => $detalle->es_servicio ? null : $codigoProducto,
-                    'producto' => $detalle->es_servicio ? null : $productoNombre,
+
+                    // ✅ MUY IMPORTANTE: esto ayuda a que el PDF muestre “nombre” aunque no use producto_auxiliar
+                    'producto' => $detalle->es_auxiliar
+                        ? ($nombreAux ? "{$nombreAux}" : null)
+                        : ($detalle->es_servicio ? null : $productoNombre),
+
                     'es_auxiliar' => $detalle->es_auxiliar,
                     'es_servicio' => $detalle->es_servicio,
+
+                    // ✅ lo visible arriba en el resource
                     'producto_auxiliar' => $auxiliarDescripcion,
+
                     'producto_servicio' => $servicioDescripcion,
+
+                    // ✅ lo que usualmente termina pintándose en PDF si lees "detalle"
                     'detalle' => $auxiliarData ? json_encode($auxiliarData, JSON_UNESCAPED_UNICODE) : null,
 
                     'cantidad' => $detalle->cantidad_pendiente,

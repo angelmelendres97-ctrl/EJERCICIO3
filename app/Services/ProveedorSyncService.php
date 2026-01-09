@@ -85,6 +85,7 @@ class ProveedorSyncService
                 DB::connection($conexionPgsql)->beginTransaction();
 
                 // 4. Obtener códigos de referencia
+                
 
                 // Sucursal por defecto
                 $sql_sucursal_default = DB::connection($conexionPgsql)->table('saesucu')->where('sucu_cod_empr', $admg_empresa)->first();
@@ -128,8 +129,8 @@ class ProveedorSyncService
                 $existeProveedor = DB::connection($conexionPgsql)->table('saeclpv')
                     ->where('clpv_cod_empr', $admg_empresa)
                     ->where('clpv_ruc_clpv', $identificacion)
-                    ->where('clv_con_clpv', $id_iden_clpv)
-                    ->where('clpv_clopv_clpv', 'PV')
+                    // ->where('clv_con_clpv', $id_iden_clpv)
+                    ->where('clpv_clopv_clpv', operator: 'PV')
                     ->first();
 
                 $clpv_cod_clpv = $existeProveedor ? $existeProveedor->clpv_cod_clpv : null;
@@ -238,9 +239,7 @@ class ProveedorSyncService
 
                 DB::connection($conexionPgsql)->commit();
             } catch (Exception $e) {
-                if ($conexionPgsql && DB::connection($conexionPgsql)->inTransaction()) {
-                    DB::connection($conexionPgsql)->rollBack();
-                }
+                DB::connection($conexionPgsql)->rollBack();
 
                 // Asegúrate de que $empresa está definido antes de intentar acceder a sus propiedades
                 $nombreEmpresa = $empresa ? $empresa->nombre_empresa : 'Desconocida';
