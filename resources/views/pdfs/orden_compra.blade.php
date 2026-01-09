@@ -319,10 +319,22 @@
 
             <tbody>
                 @foreach ($ordenCompra->detalles as $key => $detalle)
+                    @php
+                        $auxiliarData = null;
+                        if (!empty($detalle->detalle)) {
+                            $decodedDetalle = json_decode($detalle->detalle, true);
+                            if (is_array($decodedDetalle) && (isset($decodedDetalle['codigo']) || isset($decodedDetalle['descripcion']))) {
+                                $auxiliarData = $decodedDetalle;
+                            }
+                        }
+
+                        $codigoMostrar = $auxiliarData['codigo'] ?? $detalle->codigo_producto;
+                        $descripcionMostrar = $auxiliarData['descripcion'] ?? $detalle->producto;
+                    @endphp
                     <tr>
                         <td class="center">{{ $key + 1 }}</td>
-                        <td>{{ $detalle->codigo_producto }}</td>
-                        <td>{{ $detalle->producto }}</td>
+                        <td>{{ $codigoMostrar }}</td>
+                        <td>{{ $descripcionMostrar }}</td>
                         <td class="center">{{ $detalle->unidad ?? 'UN' }}</td>
                         <td class="center">{{ $detalle->cantidad }}</td>
                         <td class="right">$ {{ number_format($detalle->costo, 2) }}</td>

@@ -48,19 +48,28 @@ class EditOrdenCompra extends EditRecord
             ->get();
 
         $detallesAgrupados = $detalles->groupBy(function ($item) {
-            if (!empty($item->dped_cod_auxiliar)) {
-                return 'aux-' . ($item->dped_det_dped ?? uniqid('', true));
+            $codigoProducto = $item->dped_cod_prod ?? null;
+            $codigoBodega = $item->dped_cod_bode ?? 'bode';
+            $esServicio = $this->isServicioItem($codigoProducto);
+
+            if ($esServicio) {
+                return 'servicio-' . ($item->dped_cod_pedi ?? 'pedido') . '-' . $codigoBodega . '-' . uniqid('', true);
             }
 
-            if ($this->isServicioItem($item->dped_cod_prod ?? null)) {
-                return 'servicio-' . ($item->dped_cod_pedi ?? 'pedido') . '-' . ($item->dped_cod_bode ?? 'bode') . '-' . uniqid('', true);
+            if (!empty($item->dped_cod_auxiliar) && empty($codigoProducto)) {
+                return 'aux-' . ($item->dped_cod_auxiliar ?? $item->dped_det_dped ?? uniqid('', true));
             }
 
-            return $item->dped_cod_prod . '-' . $item->dped_cod_bode;
+            if (!empty($codigoProducto)) {
+                return $codigoProducto . '-' . $codigoBodega;
+            }
+
+            return 'aux-' . ($item->dped_det_dped ?? uniqid('', true));
         })->map(function ($group) {
             $first = $group->first();
             $cantidadPedida = $group->sum(fn($i) => (float)$i->dped_can_ped);
             $cantidadEntregada = $group->sum(fn($i) => (float)$i->dped_can_ent);
+            $codigoProducto = $first->dped_cod_prod ?? null;
             return (object) [
                 'dped_cod_prod' => $first->dped_cod_prod,
                 'cantidad_pendiente' => $cantidadPedida - $cantidadEntregada,
@@ -76,6 +85,7 @@ class EditOrdenCompra extends EditRecord
                     ?? $first->dped_desc_axiliar
                     ?? $first->deped_prod_nom
                     ?? null,
+                'codigo_producto_estandar' => $codigoProducto,
             ];
         })->where('cantidad_pendiente', '>', 0);
 
@@ -86,8 +96,9 @@ class EditOrdenCompra extends EditRecord
                 $costo = 0;
                 $impuesto = 0;
                 $productoNombre = 'Producto no encontrado';
+                $codigoProducto = $detalle->codigo_producto_estandar ?? $detalle->dped_cod_prod;
 
-                if (!$detalle->es_auxiliar && !$detalle->es_servicio) {
+                if (!$detalle->es_servicio && !empty($codigoProducto)) {
                     $productData = DB::connection($connectionName)
                         ->table('saeprod')
                         ->join('saeprbo', 'prbo_cod_prod', '=', 'prod_cod_prod')
@@ -96,25 +107,31 @@ class EditOrdenCompra extends EditRecord
                         ->where('prbo_cod_empr', $this->data['amdg_id_empresa'])
                         ->where('prbo_cod_sucu', $this->data['amdg_id_sucursal'])
                         ->where('prbo_cod_bode', $id_bodega_item)
-                        ->where('prod_cod_prod', $detalle->dped_cod_prod)
+                        ->where('prod_cod_prod', $codigoProducto)
                         ->select('prbo_uco_prod', 'prbo_iva_porc', 'prod_nom_prod')
                         ->first();
 
                     if ($productData) {
                         $costo = number_format($productData->prbo_uco_prod, 6, '.', '');
                         $impuesto = round($productData->prbo_iva_porc, 2);
-                        $productoNombre = $productData->prod_nom_prod . ' (' . $detalle->dped_cod_prod . ')';
+                        $productoNombre = $productData->prod_nom_prod . ' (' . $codigoProducto . ')';
                     }
                 }
 
                 $valor_impuesto = (floatval($detalle->cantidad_pendiente) * floatval($costo)) * (floatval($impuesto) / 100);
 
                 $auxiliarDescripcion = null;
+                $auxiliarData = null;
                 if ($detalle->es_auxiliar) {
                     $auxiliarDescripcion = trim(collect([
                         $detalle->auxiliar_codigo ? 'Código auxiliar: ' . $detalle->auxiliar_codigo : null,
                         $detalle->auxiliar_nombre ? 'Descripción: ' . $detalle->auxiliar_nombre : null,
                     ])->filter()->implode(' | '));
+
+                    $auxiliarData = [
+                        'codigo' => $detalle->auxiliar_codigo,
+                        'descripcion' => $detalle->auxiliar_nombre,
+                    ];
                 }
 
                 $servicioDescripcion = null;
@@ -127,12 +144,13 @@ class EditOrdenCompra extends EditRecord
 
                 return [
                     'id_bodega' => $id_bodega_item,
-                    'codigo_producto' => ($detalle->es_auxiliar || $detalle->es_servicio) ? null : $detalle->dped_cod_prod,
-                    'producto' => ($detalle->es_auxiliar || $detalle->es_servicio) ? null : $productoNombre,
+                    'codigo_producto' => $detalle->es_servicio ? null : $codigoProducto,
+                    'producto' => $detalle->es_servicio ? null : $productoNombre,
                     'es_auxiliar' => $detalle->es_auxiliar,
                     'es_servicio' => $detalle->es_servicio,
                     'producto_auxiliar' => $auxiliarDescripcion,
                     'producto_servicio' => $servicioDescripcion,
+                    'detalle' => $auxiliarData ? json_encode($auxiliarData, JSON_UNESCAPED_UNICODE) : null,
                     'cantidad' => $detalle->cantidad_pendiente,
                     'costo' => $costo,
                     'descuento' => 0,
