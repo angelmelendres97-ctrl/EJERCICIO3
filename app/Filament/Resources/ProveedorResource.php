@@ -96,6 +96,7 @@ class ProveedorResource extends Resource
                             }
                         })
                         ->searchable()
+                        ->preload()
                         ->live()
                         ->required(),
 
@@ -126,6 +127,7 @@ class ProveedorResource extends Resource
                             }
                         })
                         ->searchable()
+                        ->preload()
                         ->live()
                         ->required(),
 

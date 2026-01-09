@@ -109,6 +109,7 @@ class ProductoResource extends Resource
                                 }
                             })
                             ->searchable()
+                            ->preload()
                             ->live()
                             ->required(),
 
@@ -139,6 +140,7 @@ class ProductoResource extends Resource
                                 }
                             })
                             ->searchable()
+                            ->preload()
                             ->live()
                             ->required(),
                         Forms\Components\Select::make('linea')
