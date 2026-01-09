@@ -102,6 +102,7 @@ class ProveedorResource extends Resource
                         ->searchable()
                         ->preload()
                         ->live()
+                        ->reactive()
                         ->afterStateUpdated(fn(callable $set) => $set('admg_id_sucursal', null))
                         ->required(),
 
@@ -134,6 +135,7 @@ class ProveedorResource extends Resource
                         ->searchable()
                         ->preload()
                         ->live()
+                        ->reactive()
                         ->required(),
 
                     Forms\Components\Select::make('tipo')
