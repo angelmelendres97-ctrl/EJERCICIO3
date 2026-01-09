@@ -70,6 +70,10 @@ class ProveedorResource extends Resource
                         ->searchable()
                         ->preload()
                         ->live()
+                        ->afterStateUpdated(function (callable $set): void {
+                            $set('admg_id_empresa', null);
+                            $set('admg_id_sucursal', null);
+                        })
                         ->required(),
 
                     Forms\Components\Select::make('admg_id_empresa')
@@ -98,6 +102,7 @@ class ProveedorResource extends Resource
                         ->searchable()
                         ->preload()
                         ->live()
+                        ->afterStateUpdated(fn(callable $set) => $set('admg_id_sucursal', null))
                         ->required(),
 
                     Forms\Components\Select::make('admg_id_sucursal')
