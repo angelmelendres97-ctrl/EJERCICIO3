@@ -14,8 +14,6 @@ use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\DB;
 use Filament\Forms\Get;
 use Filament\Forms\Set;
-use App\Filament\Resources\ProveedorResource;
-use App\Filament\Resources\ProductoResource;
 use App\Models\Proveedores;
 use App\Models\Producto;
 use App\Services\ProveedorSyncService;
@@ -24,14 +22,8 @@ use App\Services\ProductoSyncService;
 use Filament\Forms\Components\Placeholder;
 use Filament\Forms\Components\Section;
 use Filament\Forms\Components\Grid;
-use Filament\Forms\Components\Wizard;
-use Filament\Forms\Components\Wizard\Step;
-
 use Filament\Forms\Components\Actions\Action;
-use Filament\Forms\Components\Actions;
-use Filament\Forms\Components\View;
 use Filament\Actions\StaticAction;
-use Illuminate\Database\Eloquent\Model; // ESTA LÍNEA ES NECESARIA
 use Filament\Notifications\Notification;
 use Illuminate\Database\Eloquent\Builder;
 
@@ -297,22 +289,357 @@ class OrdenCompraResource extends Resource
                                     ->modalWidth('7xl')
                                     ->modalSubmitActionLabel('Crear proveedor')
                                     ->form(function (Form $form): Form {
-                                        $schema = ProveedorResource::getFormSchema();
-
                                         return $form
                                             ->schema([
-                                                Wizard::make([
-                                                    Step::make('Información General')
-                                                        ->schema([$schema[0]]),
-                                                    Step::make('Clasificación')
-                                                        ->schema([$schema[1]]),
-                                                    Step::make('Retención')
-                                                        ->schema([$schema[2]]),
-                                                    Step::make('Información Adicional')
-                                                        ->schema([$schema[3]]),
-                                                    Step::make('Empresas')
-                                                        ->schema([$schema[4]]),
-                                                ])
+                                                Section::make('Información General')
+                                                    ->schema([
+                                                        Forms\Components\Hidden::make('id_empresa')
+                                                            ->required(),
+                                                        Forms\Components\Hidden::make('admg_id_empresa')
+                                                            ->required(),
+                                                        Forms\Components\Hidden::make('admg_id_sucursal')
+                                                            ->required(),
+                                                        Forms\Components\Select::make('tipo')
+                                                            ->label('Tipo Identificación')
+                                                            ->options(function (Get $get) {
+                                                                $empresaId = $get('id_empresa');
+                                                                $amdgIdEmpresaCode = $get('admg_id_empresa');
+
+                                                                if (!$empresaId || !$amdgIdEmpresaCode) {
+                                                                    return [];
+                                                                }
+
+                                                                $connectionName = self::getExternalConnectionName($empresaId);
+                                                                if (!$connectionName) {
+                                                                    return [];
+                                                                }
+
+                                                                try {
+                                                                    return DB::connection($connectionName)
+                                                                        ->table('comercial.tipo_iden_clpv')
+                                                                        ->pluck('identificacion', 'identificacion')
+                                                                        ->all();
+                                                                } catch (\Exception $e) {
+                                                                    return [];
+                                                                }
+                                                            })
+                                                            ->searchable()
+                                                            ->required(),
+                                                        Forms\Components\TextInput::make('ruc')
+                                                            ->label('Identificación')
+                                                            ->required()
+                                                            ->maxLength(13),
+                                                        Forms\Components\TextInput::make('nombre')
+                                                            ->label('Nombre')
+                                                            ->required()
+                                                            ->maxLength(255)
+                                                            ->live(onBlur: true)
+                                                            ->afterStateUpdated(function ($state, callable $set) {
+                                                                $set('nombre_comercial', $state);
+                                                            }),
+                                                        Forms\Components\TextInput::make('nombre_comercial')
+                                                            ->label('Nombre Comercial')
+                                                            ->required()
+                                                            ->maxLength(255),
+                                                    ])
+                                                    ->columns(2),
+                                                Section::make('Clasificación')
+                                                    ->schema([
+                                                        Forms\Components\Select::make('grupo')
+                                                            ->label('Grupo')
+                                                            ->options(function (Get $get) {
+                                                                $empresaId = $get('id_empresa');
+                                                                $amdgIdEmpresaCode = $get('admg_id_empresa');
+
+                                                                if (!$empresaId || !$amdgIdEmpresaCode) {
+                                                                    return [];
+                                                                }
+
+                                                                $connectionName = self::getExternalConnectionName($empresaId);
+                                                                if (!$connectionName) {
+                                                                    return [];
+                                                                }
+
+                                                                try {
+                                                                    return DB::connection($connectionName)
+                                                                        ->table('saegrpv')
+                                                                        ->where('grpv_cod_empr', $amdgIdEmpresaCode)
+                                                                        ->where('grpv_cod_modu', 4)
+                                                                        ->pluck('grpv_nom_grpv', 'grpv_nom_grpv')
+                                                                        ->all();
+                                                                } catch (\Exception $e) {
+                                                                    return [];
+                                                                }
+                                                            })
+                                                            ->searchable()
+                                                            ->required(),
+                                                        Forms\Components\Select::make('zona')
+                                                            ->label('Zona')
+                                                            ->options(function (Get $get) {
+                                                                $empresaId = $get('id_empresa');
+                                                                $amdgIdEmpresaCode = $get('admg_id_empresa');
+
+                                                                if (!$empresaId || !$amdgIdEmpresaCode) {
+                                                                    return [];
+                                                                }
+
+                                                                $connectionName = self::getExternalConnectionName($empresaId);
+                                                                if (!$connectionName) {
+                                                                    return [];
+                                                                }
+
+                                                                try {
+                                                                    return DB::connection($connectionName)
+                                                                        ->table('saezona')
+                                                                        ->where('zona_cod_empr', $amdgIdEmpresaCode)
+                                                                        ->pluck('zona_nom_zona', 'zona_nom_zona')
+                                                                        ->all();
+                                                                } catch (\Exception $e) {
+                                                                    return [];
+                                                                }
+                                                            })
+                                                            ->searchable()
+                                                            ->required(),
+                                                        Forms\Components\Select::make('flujo_caja')
+                                                            ->label('Flujo de Caja')
+                                                            ->options(function (Get $get) {
+                                                                $empresaId = $get('id_empresa');
+                                                                $amdgIdEmpresaCode = $get('admg_id_empresa');
+
+                                                                if (!$empresaId || !$amdgIdEmpresaCode) {
+                                                                    return [];
+                                                                }
+
+                                                                $connectionName = self::getExternalConnectionName($empresaId);
+                                                                if (!$connectionName) {
+                                                                    return [];
+                                                                }
+
+                                                                try {
+                                                                    return DB::connection($connectionName)
+                                                                        ->table('saecact')
+                                                                        ->where('cact_cod_empr', $amdgIdEmpresaCode)
+                                                                        ->pluck('cact_nom_cact', 'cact_nom_cact')
+                                                                        ->all();
+                                                                } catch (\Exception $e) {
+                                                                    return [];
+                                                                }
+                                                            })
+                                                            ->searchable()
+                                                            ->required(),
+                                                        Forms\Components\Select::make('tipo_proveedor')
+                                                            ->label('Tipo de proveedor')
+                                                            ->options(function (Get $get) {
+                                                                $empresaId = $get('id_empresa');
+                                                                $amdgIdEmpresaCode = $get('admg_id_empresa');
+
+                                                                if (!$empresaId || !$amdgIdEmpresaCode) {
+                                                                    return [];
+                                                                }
+
+                                                                $connectionName = self::getExternalConnectionName($empresaId);
+                                                                if (!$connectionName) {
+                                                                    return [];
+                                                                }
+
+                                                                try {
+                                                                    return DB::connection($connectionName)
+                                                                        ->table('saetprov')
+                                                                        ->where('tprov_cod_empr', $amdgIdEmpresaCode)
+                                                                        ->pluck('tprov_des_tprov', 'tprov_des_tprov')
+                                                                        ->all();
+                                                                } catch (\Exception $e) {
+                                                                    return [];
+                                                                }
+                                                            })
+                                                            ->searchable()
+                                                            ->required(),
+                                                    ])
+                                                    ->columns(2),
+                                                Section::make('Condiciones de Pago')
+                                                    ->schema([
+                                                        Forms\Components\Select::make('forma_pago')
+                                                            ->label('Forma de Pago')
+                                                            ->options(function (Get $get) {
+                                                                $empresaId = $get('id_empresa');
+                                                                $amdgIdEmpresaCode = $get('admg_id_empresa');
+
+                                                                if (!$empresaId || !$amdgIdEmpresaCode) {
+                                                                    return [];
+                                                                }
+
+                                                                $connectionName = self::getExternalConnectionName($empresaId);
+                                                                if (!$connectionName) {
+                                                                    return [];
+                                                                }
+
+                                                                try {
+                                                                    return DB::connection($connectionName)
+                                                                        ->table('saefpagop')
+                                                                        ->where('fpagop_cod_empr', $amdgIdEmpresaCode)
+                                                                        ->pluck('fpagop_des_fpagop', 'fpagop_des_fpagop')
+                                                                        ->all();
+                                                                } catch (\Exception $e) {
+                                                                    return [];
+                                                                }
+                                                            })
+                                                            ->searchable()
+                                                            ->required(),
+                                                        Forms\Components\Select::make('destino_pago')
+                                                            ->label('Destino Pago')
+                                                            ->options(function (Get $get) {
+                                                                $empresaId = $get('id_empresa');
+                                                                $amdgIdEmpresaCode = $get('admg_id_empresa');
+
+                                                                if (!$empresaId || !$amdgIdEmpresaCode) {
+                                                                    return [];
+                                                                }
+
+                                                                $connectionName = self::getExternalConnectionName($empresaId);
+                                                                if (!$connectionName) {
+                                                                    return [];
+                                                                }
+
+                                                                try {
+                                                                    return DB::connection($connectionName)
+                                                                        ->table('saetpago')
+                                                                        ->where('tpago_cod_empr', $amdgIdEmpresaCode)
+                                                                        ->pluck('tpago_des_tpago', 'tpago_des_tpago')
+                                                                        ->all();
+                                                                } catch (\Exception $e) {
+                                                                    return [];
+                                                                }
+                                                            })
+                                                            ->searchable()
+                                                            ->required(),
+                                                        Forms\Components\Select::make('pais_pago')
+                                                            ->label('País de Pago')
+                                                            ->options(function (Get $get) {
+                                                                $empresaId = $get('id_empresa');
+                                                                $amdgIdEmpresaCode = $get('admg_id_empresa');
+
+                                                                if (!$empresaId || !$amdgIdEmpresaCode) {
+                                                                    return [];
+                                                                }
+
+                                                                $connectionName = self::getExternalConnectionName($empresaId);
+                                                                if (!$connectionName) {
+                                                                    return [];
+                                                                }
+
+                                                                try {
+                                                                    return DB::connection($connectionName)
+                                                                        ->table('saepaisp')
+                                                                        ->pluck('paisp_des_paisp', 'paisp_des_paisp')
+                                                                        ->all();
+                                                                } catch (\Exception $e) {
+                                                                    return [];
+                                                                }
+                                                            })
+                                                            ->searchable()
+                                                            ->required(),
+                                                        Forms\Components\TextInput::make('dias_pago')
+                                                            ->numeric()
+                                                            ->label('Días de Pago'),
+                                                        Forms\Components\TextInput::make('limite_credito')
+                                                            ->numeric()
+                                                            ->label('Límite de Crédito')
+                                                            ->step('0.01'),
+                                                        Forms\Components\Select::make('lineasNegocio')
+                                                            ->label('Líneas de Negocio')
+                                                            ->relationship('lineasNegocio', 'nombre')
+                                                            ->multiple()
+                                                            ->preload()
+                                                            ->searchable()
+                                                            ->live()
+                                                            ->default(function (Get $get) {
+                                                                $empresaId = $get('id_empresa');
+                                                                if (!$empresaId) {
+                                                                    return [];
+                                                                }
+
+                                                                $lineaNegocioId = Empresa::find($empresaId)?->linea_negocio_id;
+                                                                return $lineaNegocioId ? [$lineaNegocioId] : [];
+                                                            })
+                                                            ->required(),
+                                                    ])
+                                                    ->columns(2),
+                                                Section::make('Retención')
+                                                    ->schema([
+                                                        Forms\Components\Toggle::make('aplica_retencion_sn')
+                                                            ->label('¿Aplica Retención?')
+                                                            ->default(false),
+                                                    ]),
+                                                Section::make('Información Adicional')
+                                                    ->schema([
+                                                        Forms\Components\TextInput::make('telefono')
+                                                            ->label('Teléfono')
+                                                            ->required()
+                                                            ->maxLength(20),
+                                                        Forms\Components\TextInput::make('correo')
+                                                            ->label('Email')
+                                                            ->required()
+                                                            ->maxLength(255),
+                                                        Forms\Components\TextInput::make('direcccion')
+                                                            ->label('Dirección')
+                                                            ->required()
+                                                            ->maxLength(255),
+                                                    ])
+                                                    ->columns(2),
+                                                Section::make('Empresas')
+                                                    ->schema([
+                                                        Forms\Components\CheckboxList::make('empresas_proveedor')
+                                                            ->label('Empresas para replicar')
+                                                            ->options(function (Get $get) {
+                                                                $lineasNegocioIds = $get('lineasNegocio');
+                                                                $amdgIdEmpresaCode = $get('admg_id_empresa');
+
+                                                                if (empty($lineasNegocioIds)) {
+                                                                    return [];
+                                                                }
+
+                                                                $empresas = Empresa::whereIn('linea_negocio_id', $lineasNegocioIds)
+                                                                    ->where('status_conexion', true)
+                                                                    ->get();
+
+                                                                $empresasOptions = [];
+
+                                                                foreach ($empresas as $empresa) {
+                                                                    $connectionName = self::getExternalConnectionName($empresa->id);
+                                                                    if (!$connectionName) {
+                                                                        continue;
+                                                                    }
+
+                                                                    try {
+                                                                        $externalEmpresas = DB::connection($connectionName)
+                                                                            ->table('saeempr')
+                                                                            ->get();
+
+                                                                        foreach ($externalEmpresas as $data_empresa) {
+                                                                            $optionKey = $empresa->id . '-' . trim($data_empresa->empr_cod_empr);
+                                                                            $optionLabel = $empresa->nombre_empresa . ' - ' . $data_empresa->empr_nom_empr;
+                                                                            $empresasOptions[$optionKey] = $optionLabel;
+                                                                        }
+                                                                    } catch (\Exception $e) {
+                                                                        continue;
+                                                                    }
+                                                                }
+
+                                                                return $empresasOptions;
+                                                            })
+                                                            ->columns(2)
+                                                            ->default(function (Get $get) {
+                                                                $empresaId = $get('id_empresa');
+                                                                $amdgIdEmpresaCode = $get('admg_id_empresa');
+
+                                                                if (!$empresaId || !$amdgIdEmpresaCode) {
+                                                                    return [];
+                                                                }
+
+                                                                return [$empresaId . '-' . $amdgIdEmpresaCode];
+                                                            }),
+                                                    ])
+                                                    ->columns(1),
                                             ])
                                             ->model(Proveedores::class);
                                     })
@@ -488,45 +815,353 @@ class OrdenCompraResource extends Resource
                             ->modalHeading('Registrar nuevo producto')
                             ->modalWidth('7xl')
                             ->modalSubmitActionLabel('Registrar producto')
-                            ->form(function (Form $form): Form {
-                                $schema = ProductoResource::getFormSchema();
+                                    ->form(function (Form $form): Form {
+                                        return $form
+                                            ->schema([
+                                                Section::make('Información principal')
+                                                    ->schema([
+                                                        Forms\Components\Hidden::make('id_empresa')
+                                                            ->required(),
+                                                        Forms\Components\Hidden::make('amdg_id_empresa')
+                                                            ->required(),
+                                                        Forms\Components\Hidden::make('amdg_id_sucursal')
+                                                            ->required(),
+                                                        Forms\Components\Select::make('linea')
+                                                            ->label('Línea')
+                                                            ->options(function (Get $get) {
+                                                                $empresaId = $get('id_empresa');
+                                                                $amdgIdEmpresaCode = $get('amdg_id_empresa');
 
-                                return $form
-                                    ->schema([
-                                        Wizard::make([
-                                            Step::make('Conexión e información principal')
-                                                ->schema([$schema[0]]),
-                                            Step::make('Información Producto')
-                                                ->schema([$schema[1]]),
-                                            Step::make('Sucursales y Bodegas Externas')
-                                                ->schema([$schema[2]]),
-                                        ])
-                                    ])
-                                    ->model(Producto::class);
-                            })
-                            ->mountUsing(function (Action $action): void {
-                                $data = data_get($action->getLivewire(), 'data', []);
+                                                                if (!$empresaId || !$amdgIdEmpresaCode) {
+                                                                    return [];
+                                                                }
 
-                                $action->fillForm([
-                                    'id_empresa' => $data['id_empresa'] ?? null,
-                                    'amdg_id_empresa' => $data['amdg_id_empresa'] ?? null,
-                                    'amdg_id_sucursal' => $data['amdg_id_sucursal'] ?? null,
-                                ]);
-                            })
-                            ->action(function (array $data): void {
-                                $record = Producto::create($data);
-                                $lineasNegocioIds = $data['lineasNegocio'] ?? [];
-                                if (!empty($lineasNegocioIds)) {
-                                    $record->lineasNegocio()->attach($lineasNegocioIds);
-                                }
+                                                                $connectionName = self::getExternalConnectionName($empresaId);
+                                                                if (!$connectionName) {
+                                                                    return [];
+                                                                }
 
-                                ProductoSyncService::sincronizar($record, $data);
+                                                                try {
+                                                                    return DB::connection($connectionName)
+                                                                        ->table('saelinp')
+                                                                        ->where('linp_cod_empr', $amdgIdEmpresaCode)
+                                                                        ->pluck('linp_des_linp', 'linp_cod_linp')
+                                                                        ->all();
+                                                                } catch (\Exception $e) {
+                                                                    return [];
+                                                                }
+                                                            })
+                                                            ->searchable()
+                                                            ->live()
+                                                            ->required(),
+                                                        Forms\Components\Select::make('grupo')
+                                                            ->label('Grupo')
+                                                            ->options(function (Get $get) {
+                                                                $empresaId = $get('id_empresa');
+                                                                $lineaCode = $get('linea');
+                                                                $amdgIdEmpresaCode = $get('amdg_id_empresa');
 
-                                Notification::make()
-                                    ->title('Producto creado correctamente.')
-                                    ->success()
-                                    ->send();
-                            }),
+                                                                if (!$empresaId || !$lineaCode || !$amdgIdEmpresaCode) {
+                                                                    return [];
+                                                                }
+
+                                                                $connectionName = self::getExternalConnectionName($empresaId);
+                                                                if (!$connectionName) {
+                                                                    return [];
+                                                                }
+
+                                                                try {
+                                                                    return DB::connection($connectionName)
+                                                                        ->table('saegrpr')
+                                                                        ->where('grpr_cod_linp', $lineaCode)
+                                                                        ->where('grpr_cod_empr', $amdgIdEmpresaCode)
+                                                                        ->pluck('grpr_des_grpr', 'grpr_cod_grpr')
+                                                                        ->all();
+                                                                } catch (\Exception $e) {
+                                                                    return [];
+                                                                }
+                                                            })
+                                                            ->searchable()
+                                                            ->live()
+                                                            ->required(),
+                                                        Forms\Components\Select::make('categoria')
+                                                            ->label('Categoría')
+                                                            ->options(function (Get $get) {
+                                                                $empresaId = $get('id_empresa');
+                                                                $grupoCode = $get('grupo');
+                                                                $amdgIdEmpresaCode = $get('amdg_id_empresa');
+
+                                                                if (!$empresaId || !$grupoCode || !$amdgIdEmpresaCode) {
+                                                                    return [];
+                                                                }
+
+                                                                $connectionName = self::getExternalConnectionName($empresaId);
+                                                                if (!$connectionName) {
+                                                                    return [];
+                                                                }
+
+                                                                try {
+                                                                    return DB::connection($connectionName)
+                                                                        ->table('saecate')
+                                                                        ->where('cate_cod_grpr', $grupoCode)
+                                                                        ->where('cate_cod_empr', $amdgIdEmpresaCode)
+                                                                        ->pluck('cate_nom_cate', 'cate_cod_cate')
+                                                                        ->all();
+                                                                } catch (\Exception $e) {
+                                                                    return [];
+                                                                }
+                                                            })
+                                                            ->searchable()
+                                                            ->live()
+                                                            ->required(),
+                                                        Forms\Components\Select::make('marca')
+                                                            ->label('Marca')
+                                                            ->options(function (Get $get) {
+                                                                $empresaId = $get('id_empresa');
+                                                                $categoriaCode = $get('categoria');
+                                                                $amdgIdEmpresaCode = $get('amdg_id_empresa');
+
+                                                                if (!$empresaId || !$categoriaCode || !$amdgIdEmpresaCode) {
+                                                                    return [];
+                                                                }
+
+                                                                $connectionName = self::getExternalConnectionName($empresaId);
+                                                                if (!$connectionName) {
+                                                                    return [];
+                                                                }
+
+                                                                try {
+                                                                    return DB::connection($connectionName)
+                                                                        ->table('saemarc')
+                                                                        ->where('marc_cod_cate', $categoriaCode)
+                                                                        ->where('marc_cod_empr', $amdgIdEmpresaCode)
+                                                                        ->pluck('marc_des_marc', 'marc_cod_marc')
+                                                                        ->all();
+                                                                } catch (\Exception $e) {
+                                                                    return [];
+                                                                }
+                                                            })
+                                                            ->searchable()
+                                                            ->required(),
+                                                    ])
+                                                    ->columns(2),
+                                                Section::make('Información Producto')
+                                                    ->schema([
+                                                        Forms\Components\TextInput::make('sku')
+                                                            ->label('SKU')
+                                                            ->required()
+                                                            ->unique(ignoreRecord: true)
+                                                            ->maxLength(255),
+                                                        Forms\Components\TextInput::make('nombre')
+                                                            ->required()
+                                                            ->maxLength(255),
+                                                        Forms\Components\Textarea::make('detalle')
+                                                            ->label('Detalle')
+                                                            ->rows(3)
+                                                            ->maxLength(65535)
+                                                            ->columnSpanFull(),
+                                                        Forms\Components\Select::make('tipo')
+                                                            ->label('Tipo')
+                                                            ->required()
+                                                            ->options([
+                                                                1 => 'Servicio',
+                                                                2 => 'Producto',
+                                                            ])
+                                                            ->default(2),
+                                                        Forms\Components\Select::make('id_unidad_medida')
+                                                            ->label('Unidad de Medida')
+                                                            ->relationship('unidadMedida', 'nombre')
+                                                            ->required()
+                                                            ->searchable()
+                                                            ->preload(),
+                                                        Forms\Components\TextInput::make('stock_minimo')
+                                                            ->label('Stock Mínimo')
+                                                            ->numeric()
+                                                            ->default(0)
+                                                            ->required(),
+                                                        Forms\Components\TextInput::make('stock_maximo')
+                                                            ->label('Stock Máximo')
+                                                            ->numeric()
+                                                            ->default(0)
+                                                            ->required(),
+                                                        Forms\Components\Checkbox::make('iva_sn')
+                                                            ->label('¿Aplica IVA?')
+                                                            ->default(false),
+                                                        Forms\Components\TextInput::make('porcentaje_iva')
+                                                            ->label('Porcentaje IVA (%)')
+                                                            ->numeric()
+                                                            ->default(0)
+                                                            ->required(),
+                                                        Forms\Components\Select::make('lineasNegocio')
+                                                            ->label('Líneas de Negocio')
+                                                            ->relationship('lineasNegocio', 'nombre')
+                                                            ->multiple()
+                                                            ->preload()
+                                                            ->searchable()
+                                                            ->live()
+                                                            ->default(function (Get $get) {
+                                                                $empresaId = $get('id_empresa');
+                                                                if (!$empresaId) {
+                                                                    return [];
+                                                                }
+
+                                                                $lineaNegocioId = Empresa::find($empresaId)?->linea_negocio_id;
+                                                                return $lineaNegocioId ? [$lineaNegocioId] : [];
+                                                            })
+                                                            ->required(),
+                                                    ])
+                                                    ->columns(2),
+                                                Section::make('Bodegas para sincronización')
+                                                    ->schema([
+                                                        Forms\Components\Select::make('bodega_orden')
+                                                            ->label('Bodega para la orden')
+                                                            ->options(function (Get $get) {
+                                                                $empresaId = $get('id_empresa');
+                                                                $amdgIdEmpresaCode = $get('amdg_id_empresa');
+                                                                $amdgIdSucursal = $get('amdg_id_sucursal');
+
+                                                                if (!$empresaId || !$amdgIdEmpresaCode || !$amdgIdSucursal) {
+                                                                    return [];
+                                                                }
+
+                                                                $connectionName = self::getExternalConnectionName($empresaId);
+                                                                if (!$connectionName) {
+                                                                    return [];
+                                                                }
+
+                                                                try {
+                                                                    return DB::connection($connectionName)
+                                                                        ->table('saebode')
+                                                                        ->join('saesubo', 'subo_cod_bode', '=', 'bode_cod_bode')
+                                                                        ->where('subo_cod_empr', $amdgIdEmpresaCode)
+                                                                        ->where('bode_cod_empr', $amdgIdEmpresaCode)
+                                                                        ->where('subo_cod_sucu', $amdgIdSucursal)
+                                                                        ->pluck('bode_nom_bode', 'bode_cod_bode')
+                                                                        ->all();
+                                                                } catch (\Exception $e) {
+                                                                    return [];
+                                                                }
+                                                            })
+                                                            ->searchable()
+                                                            ->required(),
+                                                        Forms\Components\CheckboxList::make('bodegas')
+                                                            ->label('Bodegas para replicar')
+                                                            ->options(function (Get $get) {
+                                                                $lineasNegocioIds = $get('lineasNegocio');
+                                                                if (empty($lineasNegocioIds)) {
+                                                                    return [];
+                                                                }
+
+                                                                $empresas = Empresa::whereIn('linea_negocio_id', $lineasNegocioIds)
+                                                                    ->where('status_conexion', true)
+                                                                    ->get();
+
+                                                                $bodegasOptions = [];
+
+                                                                foreach ($empresas as $empresa) {
+                                                                    $connectionName = self::getExternalConnectionName($empresa->id);
+                                                                    if (!$connectionName) {
+                                                                        continue;
+                                                                    }
+
+                                                                    try {
+                                                                        $externalBodegas = DB::connection($connectionName)
+                                                                            ->table('saebode as b')
+                                                                            ->join('saesubo as sb', 'b.bode_cod_bode', '=', 'sb.subo_cod_bode')
+                                                                            ->join('saesucu as s', 'sb.subo_cod_sucu', '=', 's.sucu_cod_sucu')
+                                                                            ->select('b.bode_cod_bode', 'b.bode_nom_bode', 's.sucu_nom_sucu')
+                                                                            ->get();
+
+                                                                        foreach ($externalBodegas as $bodega) {
+                                                                            $optionKey = $empresa->id . '-' . trim($bodega->bode_cod_bode);
+                                                                            $optionLabel = $empresa->nombre_empresa . ' - ' . $bodega->sucu_nom_sucu . ' - ' . $bodega->bode_nom_bode;
+                                                                            $bodegasOptions[$optionKey] = $optionLabel;
+                                                                        }
+                                                                    } catch (\Exception $e) {
+                                                                        continue;
+                                                                    }
+                                                                }
+
+                                                                return $bodegasOptions;
+                                                            })
+                                                            ->columns(2),
+                                                    ])
+                                                    ->columns(1),
+                                            ])
+                                            ->model(Producto::class);
+                                    })
+                                    ->mountUsing(function (Action $action): void {
+                                        $data = data_get($action->getLivewire(), 'data', []);
+
+                                        $action->fillForm([
+                                            'id_empresa' => $data['id_empresa'] ?? null,
+                                            'amdg_id_empresa' => $data['amdg_id_empresa'] ?? null,
+                                            'amdg_id_sucursal' => $data['amdg_id_sucursal'] ?? null,
+                                        ]);
+                                    })
+                                    ->action(function (array $data, Set $set, Get $get): void {
+                                        $record = Producto::create($data);
+                                        $lineasNegocioIds = $data['lineasNegocio'] ?? [];
+                                        if (!empty($lineasNegocioIds)) {
+                                            $record->lineasNegocio()->attach($lineasNegocioIds);
+                                        }
+
+                                        ProductoSyncService::sincronizar($record, $data);
+
+                                        $bodegaOrden = $data['bodega_orden'] ?? null;
+                                        $sku = $data['sku'] ?? null;
+                                        if ($bodegaOrden && $sku) {
+                                            $detalles = $get('detalles') ?? [];
+                                            $empresaId = $get('id_empresa');
+                                            $amdgIdEmpresa = $get('amdg_id_empresa');
+                                            $amdgIdSucursal = $get('amdg_id_sucursal');
+                                            $productoNombre = null;
+                                            $costo = 0;
+                                            $impuesto = 0;
+
+                                            $connectionName = self::getExternalConnectionName((int) $empresaId);
+                                            if ($connectionName) {
+                                                $dataProducto = DB::connection($connectionName)
+                                                    ->table('saeprod')
+                                                    ->join('saeprbo', 'prbo_cod_prod', '=', 'prod_cod_prod')
+                                                    ->where('prod_cod_sucu', $amdgIdSucursal)
+                                                    ->where('prod_cod_empr', $amdgIdEmpresa)
+                                                    ->where('prbo_cod_empr', $amdgIdEmpresa)
+                                                    ->where('prbo_cod_sucu', $amdgIdSucursal)
+                                                    ->where('prbo_cod_bode', $bodegaOrden)
+                                                    ->where('prbo_cod_prod', $sku)
+                                                    ->where('prod_cod_prod', $sku)
+                                                    ->select('prbo_uco_prod', 'prbo_iva_porc', 'prod_nom_prod')
+                                                    ->first();
+
+                                                if ($dataProducto) {
+                                                    $productoNombre = $dataProducto->prod_nom_prod;
+                                                    $costo = number_format($dataProducto->prbo_uco_prod, 6, '.', '');
+                                                    $impuesto = round($dataProducto->prbo_iva_porc, 2);
+                                                    if ($impuesto === 8.0) {
+                                                        $impuesto = 18;
+                                                    }
+                                                }
+                                            }
+
+                                            $detalles[] = [
+                                                'id_bodega' => $bodegaOrden,
+                                                'codigo_producto' => $sku,
+                                                'producto' => $productoNombre ? $productoNombre . ' (' . $sku . ')' : null,
+                                                'cantidad' => 1,
+                                                'costo' => $costo,
+                                                'descuento' => 0,
+                                                'impuesto' => $impuesto,
+                                            ];
+
+                                            $set('detalles', $detalles);
+                                        }
+
+                                        Notification::make()
+                                            ->title('Producto creado correctamente.')
+                                            ->success()
+                                            ->send();
+                                    }),
                     ])
                     ->schema([
                         Forms\Components\Repeater::make('detalles')
