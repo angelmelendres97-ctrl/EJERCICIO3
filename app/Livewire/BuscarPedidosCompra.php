@@ -20,7 +20,6 @@ use Illuminate\Support\Collection;
 use Filament\Actions\StaticAction;
 use Filament\Notifications\Notification;
 use Carbon\Carbon;
-use App\Models\OrdenCompra;
 
 class BuscarPedidosCompra extends Component implements HasForms, HasTable
 {
@@ -136,15 +135,7 @@ class BuscarPedidosCompra extends Component implements HasForms, HasTable
     {
         $fromForm = $this->parsePedidosImportados($this->pedidos_importados);
 
-        $fromOrders = OrdenCompra::query()
-            ->whereNotNull('pedidos_importados')
-            ->pluck('pedidos_importados')
-            ->flatMap(function ($value) {
-                return $this->parsePedidosImportados($value);
-            })
-            ->all();
-
-        return array_values(array_unique(array_filter(array_merge($fromForm, $fromOrders))));
+        return array_values(array_unique(array_filter($fromForm)));
     }
 
     private function parsePedidosImportados(?string $value): array
@@ -192,6 +183,7 @@ class BuscarPedidosCompra extends Component implements HasForms, HasTable
                                 ->table('saedped')
                                 ->where('dped_cod_pedi', $record->pedi_cod_pedi)
                                 ->where('dped_cod_empr', $this->amdg_id_empresa)
+                                ->whereColumn('dped_can_ped', '>', 'dped_can_ent')
                                 ->get();
                             return view('livewire.pedido-compra-detail-view', ['details' => $details]);
                         } catch (\Exception $e) {
