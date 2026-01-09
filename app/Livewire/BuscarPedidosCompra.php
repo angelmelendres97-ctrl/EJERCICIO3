@@ -20,7 +20,6 @@ use Illuminate\Support\Collection;
 use Filament\Actions\StaticAction;
 use Filament\Notifications\Notification;
 use Carbon\Carbon;
-use App\Models\OrdenCompra;
 
 class BuscarPedidosCompra extends Component implements HasForms, HasTable
 {
@@ -118,11 +117,6 @@ class BuscarPedidosCompra extends Component implements HasForms, HasTable
             ->where('saepedi.pedi_cod_sucu', $this->amdg_id_sucursal)
             ->whereColumn('saedped.dped_can_ped', '>', 'saedped.dped_can_ent');
 
-        $pedidosImportados = $this->resolvePedidosImportados();
-        if (!empty($pedidosImportados)) {
-            $query->whereNotIn('saepedi.pedi_cod_pedi', $pedidosImportados);
-        }
-
         if (!empty($formData['fecha_desde']) && !empty($formData['fecha_hasta'])) {
             $query->whereBetween('saepedi.pedi_fec_pedi', [
                 $formData['fecha_desde'],
@@ -130,21 +124,6 @@ class BuscarPedidosCompra extends Component implements HasForms, HasTable
             ]);
         }
         return $query;
-    }
-
-    private function resolvePedidosImportados(): array
-    {
-        $fromForm = $this->parsePedidosImportados($this->pedidos_importados);
-
-        $fromOrders = OrdenCompra::query()
-            ->whereNotNull('pedidos_importados')
-            ->pluck('pedidos_importados')
-            ->flatMap(function ($value) {
-                return $this->parsePedidosImportados($value);
-            })
-            ->all();
-
-        return array_values(array_unique(array_filter(array_merge($fromForm, $fromOrders))));
     }
 
     private function parsePedidosImportados(?string $value): array

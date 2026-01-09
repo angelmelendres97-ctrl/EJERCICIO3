@@ -16,6 +16,7 @@ use App\Models\Empresa;
 use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\DB;
 use Filament\Forms\Get;
+use Filament\Forms\Set;
 
 class ProveedorResource extends Resource
 {
@@ -70,6 +71,10 @@ class ProveedorResource extends Resource
                         ->searchable()
                         ->preload()
                         ->live()
+                        ->afterStateUpdated(function (Set $set): void {
+                            $set('admg_id_empresa', null);
+                            $set('admg_id_sucursal', null);
+                        })
                         ->required(),
 
                     Forms\Components\Select::make('admg_id_empresa')
@@ -98,6 +103,7 @@ class ProveedorResource extends Resource
                         ->searchable()
                         ->preload()
                         ->live()
+                        ->afterStateUpdated(fn(Set $set) => $set('admg_id_sucursal', null))
                         ->required(),
 
                     Forms\Components\Select::make('admg_id_sucursal')
