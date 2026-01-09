@@ -284,7 +284,7 @@
                         <b>Proveedor: </b> {{ $ordenCompra->proveedor }}<br>
                         <b>Para uso de: </b> {{ $ordenCompra->uso_compra }}<br>
                         <b>Solicitado por: </b> {{ $ordenCompra->solicitado_por }}<br>
-                        <b>Lugar de entrega: </b> IMBUESA<br>
+                        {{-- <b>Lugar de entrega: </b> IMBUESA<br> --}}
                     </div>
                 </div>
             </div>
@@ -323,7 +323,10 @@
                         $auxiliarData = null;
                         if (!empty($detalle->detalle)) {
                             $decodedDetalle = json_decode($detalle->detalle, true);
-                            if (is_array($decodedDetalle) && (isset($decodedDetalle['codigo']) || isset($decodedDetalle['descripcion']))) {
+                            if (
+                                is_array($decodedDetalle) &&
+                                (isset($decodedDetalle['codigo']) || isset($decodedDetalle['descripcion']))
+                            ) {
                                 $auxiliarData = $decodedDetalle;
                             }
                         }
@@ -331,11 +334,9 @@
                         $codigoMostrar = $auxiliarData['codigo'] ?? $detalle->codigo_producto;
                         $descripcionMostrar = $auxiliarData['descripcion'] ?? $detalle->producto;
                         if (!empty($auxiliarData['descripcion_auxiliar'])) {
-                            $descripcionMostrar = trim(collect([
-                                $descripcionMostrar,
-                                'Descripción auxiliar: ' . $auxiliarData['descripcion_auxiliar'],
-                            ])->filter()->implode(' | '));
+                            $descripcionMostrar = $auxiliarData['descripcion_auxiliar'];
                         }
+
                     @endphp
                     <tr>
                         <td class="center">{{ $key + 1 }}</td>
@@ -499,7 +500,8 @@
                 <b>{{ $empresaNombreUpper }}</b>. En caso de modificar las especificaciones, deberá informar a
                 <b>{{ $empresaNombreUpper }}</b> para que esta resuelva si aprueba o no tal modificación.<br>
                 D) En caso de incumplimiento de los tiempos de entrega, <b>{{ $empresaNombreUpper }}</b> decidirá si
-                acepta o no el pedido y, en caso de recibirlo, podrá multar al proveedor, descontando costos de afectación
+                acepta o no el pedido y, en caso de recibirlo, podrá multar al proveedor, descontando costos de
+                afectación
                 por la no recepción de la mercadería en la fecha acordada.<br>
             </div>
 
