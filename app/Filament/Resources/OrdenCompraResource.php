@@ -247,21 +247,6 @@ class OrdenCompraResource extends Resource
 
                 Forms\Components\Section::make('Información General')
                     ->schema([
-                        Forms\Components\TextInput::make('id_proveedor')
-                            ->numeric()
-                            ->required()
-                            ->label('ID Proveedor')
-                            ->readOnly()
-                            ->columnSpan(1),
-
-                        Forms\Components\TextInput::make('identificacion')
-                            ->maxLength(20)
-                            ->label('Identificación (RUC/DNI)')
-                            ->readOnly()
-                            ->columnSpan(1),
-
-                        Forms\Components\Hidden::make('proveedor'),
-
                         Forms\Components\Select::make('info_proveedor')
                             ->label('Proveedor')
                             ->options(function (Get $get) {
@@ -342,6 +327,21 @@ class OrdenCompraResource extends Resource
                                     $set('proveedor', null);
                                 }
                             }),
+
+                        Forms\Components\Hidden::make('proveedor'),
+
+                        Forms\Components\TextInput::make('id_proveedor')
+                            ->numeric()
+                            ->required()
+                            ->label('ID Proveedor')
+                            ->readOnly()
+                            ->columnSpan(1),
+
+                        Forms\Components\TextInput::make('identificacion')
+                            ->maxLength(20)
+                            ->label('Identificación (RUC/DNI)')
+                            ->readOnly()
+                            ->columnSpan(1),
 
                         Forms\Components\Select::make('trasanccion')
                             ->label('Transacción')
@@ -698,7 +698,15 @@ class OrdenCompraResource extends Resource
                                             })
                                             ->extraAttributes(['class' => 'text-right font-bold w-32'])
                                             ->hiddenLabel(),
-                                    ]),
+                                    ])
+                                    ->visible(function (Get $get) {
+                                        $totalIva0 = collect($get('detalles'))->where('impuesto', '0')->reduce(function ($carry, $item) {
+                                            $subtotal = floatval($item['cantidad']) * floatval($item['costo']);
+                                            return $carry + ($subtotal * 0);
+                                        }, 0);
+
+                                        return $totalIva0 > 0;
+                                    }),
 
                                 Grid::make()->columns(2)->extraAttributes(['class' => 'flex justify-end gap-4'])
                                     ->schema([
@@ -712,7 +720,15 @@ class OrdenCompraResource extends Resource
                                             })
                                             ->extraAttributes(['class' => 'text-right font-bold w-32'])
                                             ->hiddenLabel(),
-                                    ]),
+                                    ])
+                                    ->visible(function (Get $get) {
+                                        $totalIva0 = collect($get('detalles'))->where('impuesto', '0')->reduce(function ($carry, $item) {
+                                            $subtotal = floatval($item['cantidad']) * floatval($item['costo']);
+                                            return $carry + ($subtotal * 0);
+                                        }, 0);
+
+                                        return $totalIva0 > 0;
+                                    }),
 
                                 Grid::make()->columns(2)->extraAttributes(['class' => 'flex justify-end gap-4'])
                                     ->schema([
@@ -729,7 +745,13 @@ class OrdenCompraResource extends Resource
                                             })
                                             ->extraAttributes(['class' => 'text-right font-bold w-32'])
                                             ->hiddenLabel(),
-                                    ]),
+                                    ])
+                                    ->visible(function (Get $get) {
+                                        $totalIva5 = collect($get('detalles'))->where('impuesto', '5')->reduce(function ($carry, $item) {
+                                            return $carry + (floatval($item['cantidad']) * floatval($item['costo']) * 0.05);
+                                        }, 0);
+                                        return $totalIva5 > 0;
+                                    }),
 
                                 Grid::make()->columns(2)->extraAttributes(['class' => 'flex justify-end gap-4'])
                                     ->schema([
@@ -746,7 +768,13 @@ class OrdenCompraResource extends Resource
                                             })
                                             ->extraAttributes(['class' => 'text-right font-bold w-32'])
                                             ->hiddenLabel(),
-                                    ]),
+                                    ])
+                                    ->visible(function (Get $get) {
+                                        $totalIva = collect($get('detalles'))->where('impuesto', '5')->reduce(function ($carry, $item) {
+                                            return $carry + (floatval($item['cantidad']) * floatval($item['costo']) * 0.05);
+                                        }, 0);
+                                        return $totalIva > 0;
+                                    }),
 
                                 Grid::make()->columns(2)->extraAttributes(['class' => 'flex justify-end gap-4'])
                                     ->schema([
@@ -763,7 +791,13 @@ class OrdenCompraResource extends Resource
                                             })
                                             ->extraAttributes(['class' => 'text-right font-bold w-32'])
                                             ->hiddenLabel(),
-                                    ]),
+                                    ])
+                                    ->visible(function (Get $get) {
+                                        $totalIva15 = collect($get('detalles'))->where('impuesto', '15')->reduce(function ($carry, $item) {
+                                            return $carry + (floatval($item['cantidad']) * floatval($item['costo']) * 0.15);
+                                        }, 0);
+                                        return $totalIva15 > 0;
+                                    }),
 
                                 Grid::make()->columns(2)->extraAttributes(['class' => 'flex justify-end gap-4'])
                                     ->schema([
@@ -780,7 +814,13 @@ class OrdenCompraResource extends Resource
                                             })
                                             ->extraAttributes(['class' => 'text-right font-bold w-32'])
                                             ->hiddenLabel(),
-                                    ]),
+                                    ])
+                                    ->visible(function (Get $get) {
+                                        $totalIva15 = collect($get('detalles'))->where('impuesto', '15')->reduce(function ($carry, $item) {
+                                            return $carry + (floatval($item['cantidad']) * floatval($item['costo']) * 0.15);
+                                        }, 0);
+                                        return $totalIva15 > 0;
+                                    }),
 
                                 Grid::make()->columns(2)->extraAttributes(['class' => 'flex justify-end gap-4'])
                                     ->schema([
@@ -797,7 +837,13 @@ class OrdenCompraResource extends Resource
                                             })
                                             ->extraAttributes(['class' => 'text-right font-bold w-32'])
                                             ->hiddenLabel(),
-                                    ]),
+                                    ])
+                                    ->visible(function (Get $get) {
+                                        $totalIva18 = collect($get('detalles'))->where('impuesto', '18')->reduce(function ($carry, $item) {
+                                            return $carry + (floatval($item['cantidad']) * floatval($item['costo']) * 0.18);
+                                        }, 0);
+                                        return $totalIva18 > 0;
+                                    }),
 
                                 Grid::make()->columns(2)->extraAttributes(['class' => 'flex justify-end gap-4'])
                                     ->schema([
@@ -814,7 +860,13 @@ class OrdenCompraResource extends Resource
                                             })
                                             ->extraAttributes(['class' => 'text-right font-bold w-32'])
                                             ->hiddenLabel(),
-                                    ]),
+                                    ])
+                                    ->visible(function (Get $get) {
+                                        $totalIva18 = collect($get('detalles'))->where('impuesto', '18')->reduce(function ($carry, $item) {
+                                            return $carry + (floatval($item['cantidad']) * floatval($item['costo']) * 0.18);
+                                        }, 0);
+                                        return $totalIva18 > 0;
+                                    }),
 
                                 Grid::make()->columns(2)->extraAttributes(['class' => 'flex justify-end gap-4'])
                                     ->schema([
@@ -832,7 +884,14 @@ class OrdenCompraResource extends Resource
                                             })
                                             ->extraAttributes(['class' => 'text-right font-bold w-32'])
                                             ->hiddenLabel(),
-                                    ]),
+                                    ])
+                                    ->visible(function (Get $get) {
+                                        $totalImpuestos = collect($get('detalles'))->reduce(function ($carry, $item) {
+                                            $subtotal = floatval($item['cantidad']) * floatval($item['costo']);
+                                            return $carry + ($subtotal * (floatval($item['impuesto']) / 100));
+                                        }, 0);
+                                        return $totalImpuestos > 0;
+                                    }),
 
                                 Grid::make()->columns(2)->extraAttributes(['class' => 'flex justify-end mt-2 border-t border-gray-300 dark:border-gray-700 pt-2 gap-4'])
                                     ->schema([

@@ -5,6 +5,7 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Orden de Compra - Formato</title>
+
     <style>
         * {
             box-sizing: border-box;
@@ -20,7 +21,9 @@
             width: 100%;
             max-width: 1000px;
             margin: 0 auto;
-            padding: 0px;
+            /* Deja espacio para el footer fijo (políticas + firmas) */
+            padding: 0px 0px 260px;
+            position: relative;
         }
 
         .header-block {
@@ -43,7 +46,22 @@
             font-weight: 700;
         }
 
-        /* Se mantiene .flex y la estructura de información de cabecera */
+        .stamp {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            border: 2px solid #000;
+            padding: 6px 10px;
+            font-size: 18px;
+            font-weight: 700;
+            letter-spacing: 1px;
+        }
+
+        /* Cabecera info (2 columnas) */
+        .row {
+            width: 100%;
+        }
+
         .flex {
             display: flex;
             justify-content: space-between;
@@ -52,41 +70,21 @@
 
         .left-info {
             width: 100%;
-            /* Ajustado para que ocupe todo el espacio de su contenedor */
             font-size: 11px;
         }
 
-        /* Estas clases se mantienen para la sección superior */
         .col-7 {
             width: 60%;
             float: left;
-            /* Mantenemos float para que los dos divs de información se pongan lado a lado */
         }
 
         .col-5 {
             width: 40%;
             float: left;
-            /* Mantenemos float para que los dos divs de información se pongan lado a lado */
         }
 
-
-        .right-box {
-            width: 35%;
-            font-size: 13px;
-            border: 1px solid #000;
-            padding: 10px;
-        }
-
-        .right-box .row {
-            display: flex;
-            justify-content: space-between;
-            padding: 3px 0;
-        }
-
-        .right-box .title {
-            font-weight: 700;
-            text-align: center;
-            margin-bottom: 5px;
+        .clearfix {
+            clear: both;
         }
 
         table {
@@ -121,73 +119,154 @@
             text-align: right;
         }
 
-        table.reducido {
-            /* Se ha reducido el ancho para dejar espacio para la tabla de totales.
-               Se usa el 100% del contenedor col-8 para que flote correctamente. */
-            width: 65%;
+        /* ======= BLOQUE RESUMEN (Observaciones + mini-info + totales) ======= */
+        .resume-wrap {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 10px;
         }
 
+        .resume-wrap td {
+            border: none;
+            padding: 0;
+            vertical-align: top;
+        }
 
-        .policies {
-            margin-top: 15px;
+        .resume-left {
+            width: 66%;
+            padding-right: 8px;
+        }
+
+        .resume-right {
+            width: 34%;
+        }
+
+        .obs-box {
+            border: 1px solid #000;
+            padding: 6px 8px;
+            font-size: 11px;
+            min-height: 35px;
+        }
+
+        .obs-text {
+            margin-top: 4px;
+            white-space: pre-line;
+        }
+
+        .mini-info {
+            width: 65%;
+            border-collapse: collapse;
+            margin-top: 6px;
             font-size: 11px;
         }
 
-        .clearfix {
-            clear: both;
+        .mini-info th,
+        .mini-info td {
+            border: 1px solid #333;
+            padding: 4px;
+        }
+
+        .mini-info th {
+            background: #f2f2f2;
+            text-align: left;
+            width: 50%;
+        }
+
+        .totales {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 11px;
+            margin-top: 0;
+        }
+
+        .totales th,
+        .totales td {
+            border: 1px solid #333;
+            padding: 4px;
+        }
+
+        .totales th {
+            background: #f2f2f2;
+            text-align: left;
+        }
+
+        /* ======= FOOTER FIJO ======= */
+        .footer {
+            position: fixed;
+            bottom: 20px;
+            left: 20px;
+            right: 20px;
+        }
+
+        .policies {
+            margin-top: 0;
+            font-size: 11px;
+        }
+
+        /* Firmas: SIN “marco contenedor” */
+        .signatures {
+            margin-top: 40px;
+        }
+
+        .sign-table {
+            width: 100%;
+            border-collapse: collapse;
+            border: none;
+        }
+
+        .sign-table td {
+            border: none;
+            padding: 0;
+        }
+
+        .sign-cell {
+            width: 50%;
+            text-align: center;
+            padding-top: 45px;
+            /* ← MÁS ESPACIO PARA FIRMAR */
+        }
+
+        .sign-line {
+            border-top: 1px solid #000;
+            width: 80%;
+            margin: 0 auto 6px auto;
+            height: 1px;
+        }
+
+        .sign-label {
+            font-size: 11px;
+            margin-bottom: 3px;
+        }
+
+        .sign-role {
+            font-size: 11px;
         }
 
         @page {
             size: A4 portrait;
             margin: 20px;
         }
-
-        /* columnas reales para la sección inferior */
-        .col-8 {
-            width: 66%;
-            float: left;
-            display: block;
-        }
-
-        .col-4 {
-            width: 34%;
-            float: left;
-            display: block;
-        }
-
-        /* ESTE CONTENEDOR ES CLAVE: asegura que el bloque de políticas inicie después de los floats */
-        .policies-container {
-            margin-top: 20px;
-            clear: both;
-        }
-
-        /* Contenedor que envuelve col-8 y col-4 para la parte inferior */
-        .row-flex {
-            margin-top: 15px;
-            /* No se usa display: flex aquí para confiar en los floats y el clearfix */
-            /* Se usa el margen superior original */
-        }
     </style>
 </head>
 
 <body>
     <div class="page">
+
+        <div class="stamp">{{ $ordenCompra->presupuesto }}</div>
+
         <div class="header-block">
             <div class="title-main">INMOBILIARIA BUENA RENTA SA</div>
-            <div class="title-sub">ORDEN DE COMPRA N.- 0000045</div>
+            <div class="title-sub">ORDEN DE COMPRA N.- {{ $ordenCompra->numero_oc ?? '0000000' }}</div>
 
             @php
-                $nombre_formato_oc = '';
-                if ($ordenCompra->formato == 'P') {
-                    $nombre_formato_oc = 'PROFORMA';
-                } else if ($ordenCompra->formato == 'F') {
-                    $nombre_formato_oc = 'FACTURA';
-                } 
+                $nombre_formato_oc = $ordenCompra->formato == 'P' ? 'Proforma' : 'Factura';
+                $numero_formato_oc = $ordenCompra->numero_factura_proforma ?? '';
             @endphp
 
-            <div class="title-insub">FORMATO: {{ $nombre_formato_oc }}</div>
+            <div class="title-insub">{{ $nombre_formato_oc }} N.° {{ $numero_formato_oc }}</div>
         </div>
 
+        <!-- CABECERA INFO -->
         <div class="row">
             <div class="col-7">
                 <div class="flex">
@@ -205,9 +284,9 @@
                 <div class="flex">
                     <div class="left-info">
                         <b>Plazo de Entrega: </b> {{ $ordenCompra->fecha_entrega->format('d/m/Y') }}<br>
-                        <b>Direccion: </b> <br>
-                        <b>Telefono: </b> 0998612034<br>
-                        <b>Forma de Pago: </b> <br>
+                        <b>Direccion: </b> {{ $ordenCompra->direccion ?? '' }}<br>
+                        <b>Telefono: </b> {{ $ordenCompra->telefono ?? '0998612034' }}<br>
+                        <b>Forma de Pago: </b> {{ $ordenCompra->forma_pago ?? '' }}<br>
                     </div>
                 </div>
             </div>
@@ -215,6 +294,7 @@
             <div class="clearfix"></div>
         </div>
 
+        <!-- DETALLE -->
         <table>
             <thead>
                 <tr>
@@ -227,14 +307,14 @@
                     <th style="width:60px">Total</th>
                 </tr>
             </thead>
-            <tbody>
 
-                @foreach($ordenCompra->detalles as $key => $detalle)
+            <tbody>
+                @foreach ($ordenCompra->detalles as $key => $detalle)
                     <tr>
                         <td class="center">{{ $key + 1 }}</td>
                         <td>{{ $detalle->codigo_producto }}</td>
                         <td>{{ $detalle->producto }}</td>
-                        <td class="center">UN</td>
+                        <td class="center">{{ $detalle->unidad ?? 'UN' }}</td>
                         <td class="center">{{ $detalle->cantidad }}</td>
                         <td class="right">$ {{ number_format($detalle->costo, 2) }}</td>
                         <td class="right">$ {{ number_format($detalle->total, 2) }}</td>
@@ -243,174 +323,132 @@
             </tbody>
         </table>
 
-        <div class="row-flex">
+        @php
+            $nombre_tipo_oc = '';
+            if ($ordenCompra->tipo_oc == 'REEMB') {
+                $nombre_tipo_oc = 'REEMBOLSO';
+            } elseif ($ordenCompra->tipo_oc == 'COMPRA') {
+                $nombre_tipo_oc = 'COMPRA';
+            } elseif ($ordenCompra->tipo_oc == 'PAGO') {
+                $nombre_tipo_oc = 'PAGO';
+            } elseif ($ordenCompra->tipo_oc == 'REGUL') {
+                $nombre_tipo_oc = 'REGULARIZACION';
+            } elseif ($ordenCompra->tipo_oc == 'CAJAC') {
+                $nombre_tipo_oc = 'CAJA CHICA';
+            }
 
-            <div class="col-8">
-                <div class="flex" style="margin-top: 5px;">
-                    <div class="left-info">
-                        <b>Observaciones: </b> {{ $ordenCompra->observaciones }} <br>
+            $numero_pedidos = $ordenCompra->pedidos_importados ?? '';
+            $txt_pedidos = '';
+
+            if (!empty($numero_pedidos)) {
+                if (str_contains($numero_pedidos, ',')) {
+                    $array_pedidos = explode(',', $numero_pedidos);
+                    foreach ($array_pedidos as $numero_pedi) {
+                        $txt_pedidos .= trim($numero_pedi) . ' - ';
+                    }
+                    $txt_pedidos = rtrim($txt_pedidos, ' - ');
+                } else {
+                    $txt_pedidos = trim($numero_pedidos);
+                }
+            }
+        @endphp
+
+        <!-- RESUMEN (OBS + MINI INFO + TOTALES) -->
+        <table class="resume-wrap">
+            <tr>
+                <!-- IZQUIERDA -->
+                <td class="resume-left">
+                    <div class="obs-box">
+                        <b>Observaciones:</b>
+                        <div class="obs-text">{{ $ordenCompra->observaciones }}</div>
                     </div>
-                </div>
 
-                <table class="reducido" style="margin-top: 5px;">
-                    <thead>
-
+                    <table class="mini-info">
                         <tr>
-                            <th style="width:50%" class="left">Tipo Orden Compra</th>
-                            @php
-                                $nombre_tipo_oc = '';
-                                if ($ordenCompra->tipo_oc == 'REEMB') {
-                                    $nombre_tipo_oc = 'REEMBOLSO';
-                                } else if ($ordenCompra->tipo_oc == 'COMPRA') {
-                                    $nombre_tipo_oc = 'COMPRA';
-                                } else if ($ordenCompra->tipo_oc == 'PAGO') {
-                                    $nombre_tipo_oc = 'PAGO';
-                                } else if ($ordenCompra->tipo_oc == 'REGUL') {
-                                    $nombre_tipo_oc = 'REGULARIZACION';
-                                } else if ($ordenCompra->tipo_oc == 'CAJAC') {
-                                    $nombre_tipo_oc = 'CAJA CHICA';
-                                }
-                            @endphp
-                            <td style="width:50%"> {{ $nombre_tipo_oc }} </td>
-                        </tr>
-                        <tr>
-                            <th style="width:50%" class="left">Presupuesto</th>
-                            <td style="width:50%">PB</td>
-                        </tr>
-                        <tr>
-                            <th style="width:50%" class="left">Pedidos Compra Afectados</th>
-                            <td style="width:50%">
-
-                                @php
-                                    $numero_pedidos = $ordenCompra->pedidos_importados;
-                                    $txt_pedidos = '';
-
-                                    if (str_contains($numero_pedidos, ',')) {
-                                        //echo "La cadena SÍ contiene una coma.";
-                                        $array_pedidos = explode(',', $numero_pedidos);
-                                        foreach ($array_pedidos as $key => $numero_pedi) {
-                                            $txt_pedidos .= trim($numero_pedi) . " - ";
-                                        }
-                                    } else {
-                                        //echo "La cadena NO contiene una coma.";
-                                        $txt_pedidos = $numero_pedidos;
-                                    }
-                                @endphp
-                                {{  $txt_pedidos  }}
-                            </td>
+                            <th>Tipo Orden Compra</th>
+                            <td>{{ $nombre_tipo_oc }}</td>
                         </tr>
 
-                    </thead>
-                </table>
-            </div>
+                        @if ($ordenCompra->tipo_oc == 'REEMB')
+                            <tr>
+                                <th>Nombre reembolso</th>
+                                <td>{{ $ordenCompra->nombre_reembolso ?? '' }}</td>
+                            </tr>
+                        @endif
 
-            <div class="col-4">
-                <table>
-                    <thead>
+                        <tr>
+                            <th>Presupuesto</th>
+                            <td>{{ $ordenCompra->presupuesto }}</td>
+                        </tr>
+
+                        <tr>
+                            <th>Pedidos Compra Afectados</th>
+                            <td>{{ $txt_pedidos }}</td>
+                        </tr>
+                    </table>
+                </td>
+
+                <!-- DERECHA -->
+                <td class="resume-right">
+                    <table class="totales">
                         <tr>
                             <th style="width:60%" class="left">Subtotal</th>
                             <td style="width:40%" class="right">$ {{ number_format($ordenCompra->subtotal, 2) }}</td>
                         </tr>
                         <tr>
-                            <th style="width:60%" class="left">Descuento</th>
-                            <td style="width:40%" class="right">$ {{ number_format($ordenCompra->total_descuento, 2) }}
-                            </td>
+                            <th class="left">Descuento</th>
+                            <td class="right">$ {{ number_format($ordenCompra->total_descuento, 2) }}</td>
                         </tr>
                         <tr>
-                            <th style="width:60%" class="left">Iva</th>
-                            <td style="width:40%" class="right">$ {{ number_format($ordenCompra->total_impuesto, 2) }}
-                            </td>
+                            <th class="left">Iva</th>
+                            <td class="right">$ {{ number_format($ordenCompra->total_impuesto, 2) }}</td>
                         </tr>
                         <tr>
-                            <th style="width:60%" class="left">Total</th>
-                            <td style="width:40%" class="right">$ {{ number_format($ordenCompra->total, 2) }}</td>
+                            <th class="left">Total</th>
+                            <td class="right">$ {{ number_format($ordenCompra->total, 2) }}</td>
                         </tr>
-                    </thead>
-                </table>
-            </div>
+                    </table>
+                </td>
+            </tr>
+        </table>
 
-            <div class="clearfix"></div>
-
-        </div>
-
-
-        <div class="policies-container">
+        <!-- FOOTER FIJO -->
+        <div class="footer">
             <div class="policies">
                 <b>POLÍTICAS PARA LA ORDEN DE COMPRA:</b><br>
                 A) Este documento es válido solamente si está firmado por la persona autorizada para aprobar
                 compras.<br>
-                B) El proveedor sera responsable de revisar los precios establecidos en la presente orden de
-                compra,
-                esten acorde a los cotizados. Y no podran variar segun el tiempo de vigencia establecido en
-                la
+                B) El proveedor sera responsable de revisar los precios establecidos en la presente orden de compra,
+                esten acorde a los cotizados. Y no podran variar segun el tiempo de vigencia establecido en la
                 cotizacion<br>
-                C) El Proveedor sera responsable de cumplir con las especificaciones y el tiempo ofrecido y
-                acordado
-                con INMOBILIARIA BUENA RENTA SA. En caso de modificar las especificaciones deberar informar
-                a
-                INMOBILIARIA BUENA RENTA SA para que esta resuelva si aprueba o no tal modificacion<br>
-                D) El caso de inclumpliento de tiempos de entrega, INMOBILIARIA BUENA RENTA SA decidira si
-                aceptar o
-                no el pedido, y en caso de recibirlo podra multar al proveedor, escontando costos de
-                afectacion por
-                la no recepcion de la mercaderia en la fecha acordada<br>
+                C) El Proveedor sera responsable de cumplir con las especificaciones y el tiempo ofrecido y acordado con
+                INMOBILIARIA BUENA RENTA SA. En caso de modificar las especificaciones deberar informar a INMOBILIARIA
+                BUENA RENTA SA para que esta resuelva si aprueba o no tal modificacion<br>
+                D) El caso de inclumpliento de tiempos de entrega, INMOBILIARIA BUENA RENTA SA decidira si aceptar o no
+                el pedido, y en caso de recibirlo podra multar al proveedor, escontando costos de afectacion por la no
+                recepcion de la mercaderia en la fecha acordada<br>
             </div>
-        </div>
 
-        <div class="policies-container">
-            <div class="policies">
-                <br>
-                <br>
-                <br>
-                <br>
-                <br>
-                <p>
-                    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
-                    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
-                    __________________________________
-                    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
-                    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
-                    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
-                    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
-                    __________________________________
-                </p>
+            <div class="signatures">
+                <table class="sign-table">
+                    <tr>
+                        <td class="sign-cell">
+                            <div class="sign-line"></div>
+                            <div class="sign-label"><b>Elaborado por</b></div>
+                            <div class="sign-role"><b>COMPRAS</b></div>
+                        </td>
 
-                <p>
-                    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
-                    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
-                    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
-                    &nbsp;&nbsp;&nbsp;&nbsp;
-                    <b>Elaborado por</b>
-                    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
-                    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
-                    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
-                    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
-                    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
-                    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
-                    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
-                    <b>Aprobado por</b>
-                </p>
-                <p>
-                    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
-                    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
-                    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
-                    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
-                    <b>COMPRAS</b>
-                    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
-                    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
-                    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
-                    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
-                    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
-                    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
-                    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
-                    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
-                    <b>GERENCIA</b>
-                </p>
+                        <td class="sign-cell">
+                            <div class="sign-line"></div>
+                            <div class="sign-label"><b>Aprobado por</b></div>
+                            <div class="sign-role"><b>GERENCIA</b></div>
+                        </td>
+                    </tr>
+                </table>
             </div>
         </div>
 
     </div>
-
 </body>
 
 </html>

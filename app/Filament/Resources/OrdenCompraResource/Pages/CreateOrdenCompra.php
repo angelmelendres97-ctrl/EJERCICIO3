@@ -14,14 +14,11 @@ use Illuminate\Validation\ValidationException;
 class CreateOrdenCompra extends CreateRecord
 {
     protected static string $resource = OrdenCompraResource::class;
+    protected static string $view = 'filament.resources.orden-compra-resource.pages.create-orden-compra';
 
 
     protected function getRedirectUrl(): string
     {
-        if ($this->record) {
-            return route('orden-compra.pdf', $this->record);
-        }
-
         return $this->getResource()::getUrl('index');
     }
 
@@ -72,6 +69,13 @@ class CreateOrdenCompra extends CreateRecord
 
             return $record;
         });
+    }
+
+    protected function afterCreate(): void
+    {
+        if ($this->record) {
+            $this->dispatch('open-orden-compra-pdf', url: route('orden-compra.pdf', $this->record));
+        }
     }
 
     public function onPedidosSeleccionados($pedidos, $connectionId, $motivo)
