@@ -229,7 +229,7 @@ class BuscarPedidosCompra extends Component implements HasForms, HasTable
 
                         // 🔥 CERRAR MODAL 100% SEGURO
                         $action->cancel();
-                        $this->dispatch('close-modal', id: 'filtrar-pedidos');
+                        $this->dispatch('close-modal', id: 'importar_pedido');
                     })
             ]);
 

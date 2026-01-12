@@ -182,7 +182,7 @@ class EditOrdenCompra extends EditRecord
 
         $this->applySolicitadoPor($connectionName, $this->parsePedidosImportados($this->data['pedidos_importados'] ?? ''));
 
-        $this->dispatch('close-modal', id: 'filtrar-pedidos');
+        $this->dispatch('close-modal', id: 'importar_pedido');
     }
 
     private function recalculateTotals()

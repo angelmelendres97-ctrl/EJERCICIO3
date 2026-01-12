@@ -178,7 +178,8 @@ class ResumenPedidosResource extends Resource
                                     ->where('id_empresa', $id_empresa)
                                     ->where('amdg_id_empresa', $amdg_id_empresa)
                                     ->where('amdg_id_sucursal', $amdg_id_sucursal)
-                                    ->whereNotIn('id', $ordenesExistentes);
+                                    ->whereNotIn('id', $ordenesExistentes)
+                                    ->where('anulada', false);
 
                                 if (!empty($fecha_desde) && !empty($fecha_hasta)) {
                                     $query->whereBetween('fecha_pedido', [$fecha_desde, $fecha_hasta]);

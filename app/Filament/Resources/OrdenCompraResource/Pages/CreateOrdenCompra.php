@@ -272,7 +272,7 @@ class CreateOrdenCompra extends CreateRecord
         $this->applySolicitadoPor($connectionName, $pedidosUnicos);
 
         // Use a more specific event name if needed, or just close the generic modal
-        $this->dispatch('close-modal', id: 'filtrar-pedidos');
+        $this->dispatch('close-modal', id: 'importar_pedido');
     }
 
     protected function beforeCreate(): void
