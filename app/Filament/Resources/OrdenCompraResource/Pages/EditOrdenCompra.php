@@ -47,17 +47,23 @@ class EditOrdenCompra extends EditRecord
             ->whereColumn('dped_can_ped', '>', 'dped_can_ent')
             ->get();
 
-        $detallesAgrupados = $detalles->groupBy(function ($item) {
+        $detallesAgrupados = $detalles->values()->groupBy(function ($item, $key) {
             $codigoProducto = $item->dped_cod_prod ?? null;
             $codigoBodega = $item->dped_cod_bode ?? 'bode';
             $esServicio = $this->isServicioItem($codigoProducto);
+            $esAuxiliar = $this->isAuxiliarItem($item);
 
             if ($esServicio) {
                 return 'servicio-' . ($item->dped_cod_pedi ?? 'pedido') . '-' . $codigoBodega . '-' . uniqid('', true);
             }
 
-            if (!empty($item->dped_cod_auxiliar) && empty($codigoProducto)) {
-                return 'aux-' . ($item->dped_cod_auxiliar ?? $item->dped_det_dped ?? uniqid('', true));
+            if ($esAuxiliar) {
+                $auxKey = $item->dped_cod_auxiliar
+                    ?? $item->dped_desc_auxiliar
+                    ?? $item->dped_desc_axiliar
+                    ?? $item->dped_det_dped
+                    ?? 'aux';
+                return 'aux-' . ($item->dped_cod_pedi ?? 'pedido') . '-' . $codigoBodega . '-' . $auxKey . '-' . $key;
             }
 
             if (!empty($codigoProducto)) {
@@ -74,7 +80,7 @@ class EditOrdenCompra extends EditRecord
                 'dped_cod_prod' => $first->dped_cod_prod,
                 'cantidad_pendiente' => $cantidadPedida - $cantidadEntregada,
                 'dped_cod_bode' => $first->dped_cod_bode,
-                'es_auxiliar' => !empty($first->dped_cod_auxiliar),
+                'es_auxiliar' => $this->isAuxiliarItem($first),
                 'es_servicio' => $this->isServicioItem($first->dped_cod_prod ?? null),
                 'auxiliar_codigo' => $first->dped_cod_auxiliar ?? null,
                 'auxiliar_descripcion' => $first->dped_desc_auxiliar
@@ -214,6 +220,13 @@ class EditOrdenCompra extends EditRecord
         }
 
         return (bool) preg_match('/^SP[-\\s]*SP[-\\s]*SP/i', $codigoProducto);
+    }
+
+    private function isAuxiliarItem(object $item): bool
+    {
+        return !empty($item->dped_cod_auxiliar)
+            || !empty($item->dped_desc_auxiliar)
+            || !empty($item->dped_desc_axiliar);
     }
 
     private function parsePedidosImportados(?string $value): array
