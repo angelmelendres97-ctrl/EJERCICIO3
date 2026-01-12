@@ -336,7 +336,6 @@
                         if (!empty($auxiliarData['descripcion_auxiliar'])) {
                             $descripcionMostrar = $auxiliarData['descripcion_auxiliar'];
                         }
-
                     @endphp
                     <tr>
                         <td class="center">{{ $key + 1 }}</td>
@@ -344,8 +343,18 @@
                         <td>{{ $descripcionMostrar }}</td>
                         <td class="center">{{ $detalle->unidad ?? 'UN' }}</td>
                         <td class="center">{{ $detalle->cantidad }}</td>
-                        <td class="right">$ {{ number_format($detalle->costo, 2) }}</td>
-                        <td class="right">$ {{ number_format($detalle->total, 2) }}</td>
+                        @php
+                            // Asegura números válidos
+                            $cantidadImp = (float) ($detalle->cantidad ?? 0);
+                            $precioUnitImp = (float) ($detalle->costo ?? 0);
+
+                            // Total calculado: precio unitario * cantidad
+                            $totalImp = $cantidadImp * $precioUnitImp;
+                        @endphp
+
+                        <td class="right">${{ number_format($precioUnitImp, 6, '.', '') }}</td>
+                        <td class="right">${{ number_format($totalImp, 2, '.', '') }}</td>
+
                     </tr>
                 @endforeach
             </tbody>
@@ -453,10 +462,10 @@
                         {{-- Filas dinámicas por IVA (solo si existen ítems con ese porcentaje) --}}
                         @foreach ($basePorIva as $rate => $base)
                             @if (round($base, 6) > 0)
-                                <tr>
+                               {{--  <tr>
                                     <th class="left">Subtotal IVA {{ $fmtRate($rate) }}%</th>
                                     <td class="right">$ {{ number_format($base, 2) }}</td>
-                                </tr>
+                                </tr> --}}
                                 <tr>
                                     <th class="left">IVA {{ $fmtRate($rate) }}%</th>
                                     <td class="right">$ {{ number_format($ivaPorIva[$rate] ?? 0, 2) }}</td>
@@ -465,12 +474,12 @@
                         @endforeach
 
                         {{-- Total impuestos (si quieres mantener la fila “IVA” general) --}}
-                        <tr>
+                       {{--  <tr>
                             <th class="left">IVA</th>
                             <td class="right">
                                 $ {{ number_format($ordenCompra->total_impuesto ?? $totalImpuestosCalc, 2) }}
                             </td>
-                        </tr>
+                        </tr> --}}
 
                         <tr>
                             <th class="left">Total</th>

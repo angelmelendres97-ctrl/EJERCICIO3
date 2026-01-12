@@ -22,7 +22,9 @@ class ResumenPedidosController extends Controller
         $resumenPedidos->load('detalles', 'empresa', 'usuario');
 
         $nombreEmpresaTitulo = $resumenPedidos->empresa->nombre_empresa ?? 'Nombre de Empresa no disponible';
-        if ($resumenPedidos->tipo === 'AZ') {
+        if ($resumenPedidos->tipo === 'PB') {
+            $nombreEmpresaTitulo = $resumenPedidos->empresa->nombre_pb ?: $nombreEmpresaTitulo;
+        } elseif ($resumenPedidos->tipo === 'AZ') {
             $connectionName = ResumenPedidosResource::getExternalConnectionName((int) $resumenPedidos->id_empresa);
             if ($connectionName) {
                 try {

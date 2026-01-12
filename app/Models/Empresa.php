@@ -9,6 +9,7 @@ class Empresa extends Model
     protected $fillable = [
         'ruc',
         'nombre_empresa',
+        'nombre_pb',
         'tipo',
         'linea_negocio_id',
         'motor',
