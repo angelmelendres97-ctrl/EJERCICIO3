@@ -111,17 +111,23 @@ class CreateOrdenCompra extends CreateRecord
             ->get();
 
         // Group by product/warehouse, keeping services separate and auxiliars grouped by standard code when available.
-        $detallesAgrupados = $detalles->groupBy(function ($item) {
+        $detallesAgrupados = $detalles->values()->groupBy(function ($item, $key) {
             $codigoProducto = $item->dped_cod_prod ?? null;
             $codigoBodega = $item->dped_cod_bode ?? 'bode';
             $esServicio = $this->isServicioItem($codigoProducto);
+            $esAuxiliar = $this->isAuxiliarItem($item);
 
             if ($esServicio) {
                 return 'servicio-' . ($item->dped_cod_pedi ?? 'pedido') . '-' . $codigoBodega . '-' . uniqid('', true);
             }
 
-            if (!empty($item->dped_cod_auxiliar) && empty($codigoProducto)) {
-                return 'aux-' . ($item->dped_cod_auxiliar ?? $item->dped_det_dped ?? uniqid('', true));
+            if ($esAuxiliar) {
+                $auxKey = $item->dped_cod_auxiliar
+                    ?? $item->dped_desc_auxiliar
+                    ?? $item->dped_desc_axiliar
+                    ?? $item->dped_det_dped
+                    ?? 'aux';
+                return 'aux-' . ($item->dped_cod_pedi ?? 'pedido') . '-' . $codigoBodega . '-' . $auxKey . '-' . $key;
             }
 
             if (!empty($codigoProducto)) {
@@ -134,7 +140,7 @@ class CreateOrdenCompra extends CreateRecord
             $cantidadPedida = $group->sum(fn($i) => (float) $i->dped_can_ped);
             $cantidadEntregada = $group->sum(fn($i) => (float) $i->dped_can_ent);
             $cantidadPendiente = $cantidadPedida - $cantidadEntregada;
-            $esAuxiliar = !empty($first->dped_cod_auxiliar);
+            $esAuxiliar = $this->isAuxiliarItem($first);
             $esServicio = $this->isServicioItem($first->dped_cod_prod ?? null);
             $codigoProducto = $first->dped_cod_prod ?? null;
 
@@ -309,6 +315,13 @@ class CreateOrdenCompra extends CreateRecord
         }
 
         return (bool) preg_match('/^SP[-\\s]*SP[-\\s]*SP/i', $codigoProducto);
+    }
+
+    private function isAuxiliarItem(object $item): bool
+    {
+        return !empty($item->dped_cod_auxiliar)
+            || !empty($item->dped_desc_auxiliar)
+            || !empty($item->dped_desc_axiliar);
     }
 
     private function applySolicitadoPor(string $connectionName, array $pedidos): void
