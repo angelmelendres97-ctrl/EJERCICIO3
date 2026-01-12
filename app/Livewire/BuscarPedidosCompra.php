@@ -112,10 +112,33 @@ class BuscarPedidosCompra extends Component implements HasForms, HasTable
         $query = $model->newQuery()
             ->select('saepedi.*')
             ->distinct()
-            ->join('saedped', 'saedped.dped_cod_pedi', '=', 'saepedi.pedi_cod_pedi')
+            ->leftJoin('saedped', function ($join) {
+                $join->on('saedped.dped_cod_pedi', '=', 'saepedi.pedi_cod_pedi');
+                // Si tu tabla de detalle tiene empresa/sucursal, puedes amarrarlo aquí también si aplica:
+                // $join->on('saedped.dped_cod_empr', '=', 'saepedi.pedi_cod_empr');
+                // $join->on('saedped.dped_cod_sucu', '=', 'saepedi.pedi_cod_sucu');
+            })
             ->where('saepedi.pedi_cod_empr', $this->amdg_id_empresa)
             ->where('saepedi.pedi_cod_sucu', $this->amdg_id_sucursal)
-            ->whereColumn('saedped.dped_can_ped', '>', 'saedped.dped_can_ent');
+            ->where(function ($q) {
+                // ✅ 1) Pedidos con items pendientes
+                $q->where(function ($qq) {
+                    $qq->whereNotNull('saedped.dped_cod_pedi')
+                        ->whereColumn('saedped.dped_can_ped', '>', 'saedped.dped_can_ent');
+                });
+
+                // ✅ 2) O pedidos ANULADOS (ajusta el campo/valor según tu base)
+                $q->orWhere(function ($qq) {
+                    // EJEMPLOS (usa el que aplique en tu SAE):
+                    // $qq->where('saepedi.pedi_est_pedi', 'ANU');
+                    // $qq->where('saepedi.pedi_est_pedi', 'A');
+                    // $qq->where('saepedi.pedi_anu_pedi', 'S');
+                    // $qq->where('saepedi.pedi_anulado', 1);
+
+                    $qq->where('saepedi.pedi_est_pedi', 'ANU'); // <-- CAMBIA AQUÍ si tu campo/valor es otro
+                });
+            });
+
 
         $pedidosImportados = $this->resolvePedidosImportados();
         if (!empty($pedidosImportados)) {
@@ -229,10 +252,12 @@ class BuscarPedidosCompra extends Component implements HasForms, HasTable
 
                         // 🔥 CERRAR MODAL 100% SEGURO
                         $action->cancel();
-                        $this->dispatch('close-modal', id: 'importar_pedido');
+                        //$this->dispatch('close-modal', id: 'importar_pedido');
+                        $this->dispatch('close-modal', id: 'mountedFormComponentAction');
+
+                        //$this->dispatch('close-modal', id: 'mountedAction');
                     })
             ]);
-
     }
 
     public function getTableRecordKey(Model $record): string
@@ -261,7 +286,6 @@ class BuscarPedidosCompra extends Component implements HasForms, HasTable
             ->title('Producto finalizado correctamente')
             ->success()
             ->send();
-
     }
 
     public function render()
