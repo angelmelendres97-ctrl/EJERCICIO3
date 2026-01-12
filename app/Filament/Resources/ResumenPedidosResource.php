@@ -178,6 +178,7 @@ class ResumenPedidosResource extends Resource
                                     ->where('id_empresa', $id_empresa)
                                     ->where('amdg_id_empresa', $amdg_id_empresa)
                                     ->where('amdg_id_sucursal', $amdg_id_sucursal)
+                                    ->where('anulada', false)
                                     ->whereNotIn('id', $ordenesExistentes);
 
                                 if (!empty($fecha_desde) && !empty($fecha_hasta)) {
