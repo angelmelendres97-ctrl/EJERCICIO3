@@ -9,6 +9,7 @@ use Filament\Actions\Action;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Validation\ValidationException;
 
 class CreateOrdenCompra extends CreateRecord
 {
@@ -81,9 +82,14 @@ class CreateOrdenCompra extends CreateRecord
             return;
         }
 
+        $pedidosNormalizados = $this->normalizePedidosImportados($pedidos);
+        $pedidosExistentes = $this->normalizePedidosImportados($this->data['pedidos_importados'] ?? null);
+
+        $pedidosUnicos = array_values(array_unique(array_merge($pedidosExistentes, $pedidosNormalizados)));
+
         $this->data['pedidos_importados'] = implode(', ', array_map(
             fn($pedi) => str_pad($pedi, 8, "0", STR_PAD_LEFT),
-            $pedidos
+            $pedidosUnicos
         ));
 
         $connectionName = OrdenCompraResource::getExternalConnectionName($connectionId);
@@ -99,19 +105,30 @@ class CreateOrdenCompra extends CreateRecord
             ->whereColumn('dped_can_ped', '>', 'dped_can_ent')
             ->get();
 
-        // Group by both product code and warehouse code
+        // Group by both product code and warehouse code, but keep auxiliar products separate.
         $detallesAgrupados = $detalles->groupBy(function ($item) {
+            if (!empty($item->dped_cod_auxiliar)) {
+                return 'aux-' . ($item->dped_det_dped ?? uniqid('', true));
+            }
+
             return $item->dped_cod_prod . '-' . $item->dped_cod_bode;
         })->map(function ($group) {
             $first = $group->first();
-            // Sum quantities for items with the same product and warehouse
-            $cantidadPedida = $group->sum(fn($i) => (float)$i->dped_can_ped);
-            $cantidadEntregada = $group->sum(fn($i) => (float)$i->dped_can_ent);
+            $cantidadPedida = $group->sum(fn($i) => (float) $i->dped_can_ped);
+            $cantidadEntregada = $group->sum(fn($i) => (float) $i->dped_can_ent);
+            $cantidadPendiente = $cantidadPedida - $cantidadEntregada;
+            $esAuxiliar = !empty($first->dped_cod_auxiliar);
 
             return (object) [
                 'dped_cod_prod' => $first->dped_cod_prod,
-                'cantidad_pendiente' => $cantidadPedida - $cantidadEntregada,
+                'cantidad_pendiente' => $cantidadPendiente,
                 'dped_cod_bode' => $first->dped_cod_bode,
+                'es_auxiliar' => $esAuxiliar,
+                'auxiliar_codigo' => $first->dped_cod_auxiliar ?? null,
+                'auxiliar_nombre' => $first->dped_det_dped
+                    ?? $first->dped_desc_axiliar
+                    ?? $first->deped_prod_nom
+                    ?? null,
             ];
         })->where('cantidad_pendiente', '>', 0); // Filter out fully delivered items
 
@@ -120,34 +137,47 @@ class CreateOrdenCompra extends CreateRecord
                 // Use the specific warehouse code for this group
                 $id_bodega_item = $detalle->dped_cod_bode;
 
-                $productData = DB::connection($connectionName)
-                    ->table('saeprod')
-                    ->join('saeprbo', 'prbo_cod_prod', '=', 'prod_cod_prod')
-                    ->where('prod_cod_empr', $this->data['amdg_id_empresa'])
-                    ->where('prod_cod_sucu', $this->data['amdg_id_sucursal'])
-                    ->where('prbo_cod_empr', $this->data['amdg_id_empresa'])
-                    ->where('prbo_cod_sucu', $this->data['amdg_id_sucursal'])
-                    ->where('prbo_cod_bode', $id_bodega_item) // Use the item-specific warehouse
-                    ->where('prod_cod_prod', $detalle->dped_cod_prod)
-                    ->select('prbo_uco_prod', 'prbo_iva_porc', 'prod_nom_prod')
-                    ->first();
-
                 $costo = 0;
                 $impuesto = 0;
                 $productoNombre = 'Producto no encontrado';
 
-                if ($productData) {
-                    $costo = number_format($productData->prbo_uco_prod, 6, '.', '');
-                    $impuesto = round($productData->prbo_iva_porc, 2);
-                    $productoNombre = $productData->prod_nom_prod . ' (' . $detalle->dped_cod_prod . ')';
+                if (!$detalle->es_auxiliar) {
+                    $productData = DB::connection($connectionName)
+                        ->table('saeprod')
+                        ->join('saeprbo', 'prbo_cod_prod', '=', 'prod_cod_prod')
+                        ->where('prod_cod_empr', $this->data['amdg_id_empresa'])
+                        ->where('prod_cod_sucu', $this->data['amdg_id_sucursal'])
+                        ->where('prbo_cod_empr', $this->data['amdg_id_empresa'])
+                        ->where('prbo_cod_sucu', $this->data['amdg_id_sucursal'])
+                        ->where('prbo_cod_bode', $id_bodega_item) // Use the item-specific warehouse
+                        ->where('prod_cod_prod', $detalle->dped_cod_prod)
+                        ->select('prbo_uco_prod', 'prbo_iva_porc', 'prod_nom_prod')
+                        ->first();
+
+                    if ($productData) {
+                        $costo = number_format($productData->prbo_uco_prod, 6, '.', '');
+                        $impuesto = round($productData->prbo_iva_porc, 2);
+                        $productoNombre = $productData->prod_nom_prod . ' (' . $detalle->dped_cod_prod . ')';
+                    }
                 }
 
                 $valor_impuesto = (floatval($detalle->cantidad_pendiente) * floatval($costo)) * (floatval($impuesto) / 100);
+                $auxiliarDescripcion = null;
+
+                if ($detalle->es_auxiliar) {
+                    $auxiliarDescripcion = trim(collect([
+                        $detalle->auxiliar_codigo ? 'Código auxiliar: ' . $detalle->auxiliar_codigo : null,
+                        $detalle->auxiliar_nombre ? 'Descripción: ' . $detalle->auxiliar_nombre : null,
+                    ])->filter()->implode(' | '));
+                }
 
                 return [
                     'id_bodega' => $id_bodega_item, // Set the correct warehouse for this line
-                    'codigo_producto' => $detalle->dped_cod_prod,
-                    'producto' => $productoNombre,
+                    'codigo_producto' => $detalle->es_auxiliar ? null : $detalle->dped_cod_prod,
+                    'producto' => $detalle->es_auxiliar ? null : $productoNombre,
+                    'es_auxiliar' => $detalle->es_auxiliar,
+                    'producto_auxiliar' => $auxiliarDescripcion,
+
                     'cantidad' => $detalle->cantidad_pendiente,
                     'costo' => $costo,
                     'descuento' => 0,
@@ -186,4 +216,34 @@ class CreateOrdenCompra extends CreateRecord
         $this->dispatch('close-modal', id: 'filtrar-pedidos');
     }
 
+    protected function beforeCreate(): void
+    {
+        $detalles = $this->data['detalles'] ?? [];
+
+        $faltantes = collect($detalles)->filter(function ($detalle) {
+            return !empty($detalle['es_auxiliar']) && empty($detalle['codigo_producto']);
+        });
+
+        if ($faltantes->isNotEmpty()) {
+            throw ValidationException::withMessages([
+                'detalles' => 'Debe seleccionar un producto del inventario para cada ítem auxiliar.',
+            ]);
+        }
+    }
+
+    private function normalizePedidosImportados(array|string|null $pedidos): array
+    {
+        if (empty($pedidos)) {
+            return [];
+        }
+
+        $lista = is_array($pedidos) ? $pedidos : preg_split('/\\s*,\\s*/', trim((string) $pedidos));
+
+        return collect($lista)
+            ->filter()
+            ->map(fn($pedido) => (int) ltrim((string) $pedido, '0'))
+            ->filter(fn($pedido) => $pedido > 0)
+            ->values()
+            ->all();
+    }
 }
