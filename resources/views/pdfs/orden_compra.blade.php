@@ -14,14 +14,15 @@
         body {
             font-family: Arial, Helvetica, sans-serif;
             margin: 0;
-            padding: 10px;
+            line-height: 1.35;
+            padding: 20px;
         }
 
         .page {
             width: 100%;
             max-width: 1000px;
             margin: 0 auto;
-            /* Deja espacio para el footer fijo (pol√≠ticas + firmas) */
+            /* Deja espacio para el footer fijo (polÌticas + firmas) */
             padding: 0px 0px 260px;
             position: relative;
         }
@@ -90,9 +91,13 @@
         table {
             width: 100%;
             border-collapse: collapse;
-            margin-top: 15px;
+            margin-top: 25px;
+            /* m·s espacio arriba */
+            margin-bottom: 25px;
+            /* m·s espacio abajo */
             font-size: 13px;
         }
+
 
         table th,
         table td {
@@ -203,7 +208,7 @@
             font-size: 11px;
         }
 
-        /* Firmas: SIN ‚Äúmarco contenedor‚Äù */
+        /* Firmas: SIN ìmarco contenedorî */
         .signatures {
             margin-top: 40px;
         }
@@ -222,8 +227,8 @@
         .sign-cell {
             width: 50%;
             text-align: center;
-            padding-top: 45px;
-            /* ‚Üê M√ÅS ESPACIO PARA FIRMAR */
+            padding-top: 55px;
+            /* ? M¡S ESPACIO PARA FIRMAR */
         }
 
         .sign-line {
@@ -246,6 +251,13 @@
             size: A4 portrait;
             margin: 20px;
         }
+
+        .detalle-table {
+            margin-top: 30px;
+            margin-bottom: 30px;
+        }
+
+        /* ===== FIRMAS FIJAS ABAJO ===== */
     </style>
 </head>
 
@@ -255,15 +267,15 @@
         <div class="stamp">{{ $ordenCompra->presupuesto }}</div>
 
         <div class="header-block">
-            <div class="title-main">INMOBILIARIA BUENA RENTA SA</div>
-            <div class="title-sub">ORDEN DE COMPRA N.- {{ $ordenCompra->numero_oc ?? '0000000' }}</div>
+            <div class="title-main">{{ $ordenCompra->empresa->nombre_empresa }}</div>
+            <div class="title-sub">ORDEN DE COMPRA N.- {{ str_pad($ordenCompra->id, 8, '0', STR_PAD_LEFT) }}</div>
 
             @php
                 $nombre_formato_oc = $ordenCompra->formato == 'P' ? 'Proforma' : 'Factura';
                 $numero_formato_oc = $ordenCompra->numero_factura_proforma ?? '';
             @endphp
 
-            <div class="title-insub">{{ $nombre_formato_oc }} N.¬∞ {{ $numero_formato_oc }}</div>
+            <div class="title-sub">{{ $nombre_formato_oc }} N.∞ {{ $numero_formato_oc }}</div>
         </div>
 
         <!-- CABECERA INFO -->
@@ -295,12 +307,12 @@
         </div>
 
         <!-- DETALLE -->
-        <table>
+        <table class="detalle-table">
             <thead>
                 <tr>
                     <th style="width:20px">#</th>
-                    <th style="width:100px">C√≥digo</th>
-                    <th>Descripci√≥n</th>
+                    <th style="width:100px">CÛdigo</th>
+                    <th>DescripciÛn</th>
                     <th style="width:40px">Unid.</th>
                     <th style="width:60px">Cant.</th>
                     <th style="width:60px">Precio U.</th>
@@ -414,19 +426,26 @@
 
         <!-- FOOTER FIJO -->
         <div class="footer">
+            @php
+                $empresaNombre = $ordenCompra->empresa->nombre_empresa ?? 'LA EMPRESA';
+                $empresaNombreUpper = mb_strtoupper($empresaNombre, 'UTF-8');
+            @endphp
             <div class="policies">
-                <b>POL√çTICAS PARA LA ORDEN DE COMPRA:</b><br>
-                A) Este documento es v√°lido solamente si est√° firmado por la persona autorizada para aprobar
+                <b>POLÕTICAS PARA LA ORDEN DE COMPRA:</b><br>
+                A) Este documento es v·lido solamente si est· firmado por la persona autorizada para aprobar
                 compras.<br>
                 B) El proveedor sera responsable de revisar los precios establecidos en la presente orden de compra,
                 esten acorde a los cotizados. Y no podran variar segun el tiempo de vigencia establecido en la
                 cotizacion<br>
                 C) El Proveedor sera responsable de cumplir con las especificaciones y el tiempo ofrecido y acordado con
-                INMOBILIARIA BUENA RENTA SA. En caso de modificar las especificaciones deberar informar a INMOBILIARIA
-                BUENA RENTA SA para que esta resuelva si aprueba o no tal modificacion<br>
-                D) El caso de inclumpliento de tiempos de entrega, INMOBILIARIA BUENA RENTA SA decidira si aceptar o no
+                <b>{{ $empresaNombreUpper }}</b>. En caso de modificar las especificaciones deberar informar a
+                <b>{{ $empresaNombreUpper }}</b> para que esta resuelva si aprueba o no tal modificacion<br>
+
+                D) El caso de inclumpliento de tiempos de entrega, <b>{{ $empresaNombreUpper }}</b> decidira si aceptar
+                o no
                 el pedido, y en caso de recibirlo podra multar al proveedor, escontando costos de afectacion por la no
                 recepcion de la mercaderia en la fecha acordada<br>
+
             </div>
 
             <div class="signatures">

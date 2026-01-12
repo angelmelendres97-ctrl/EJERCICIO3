@@ -7,8 +7,21 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Presupuesto de pago a proveedores</title>
     <style>
+
+        html, body,
+.page,
+div, span, p,
+table, thead, tbody, tfoot, tr, th, td,
+.header-date, .header-block,
+.company-name, .doc-line, .doc-number, .doc-type,
+.left-info,
+.signatures, .signatures-fixed,
+.sign-table, .sign-cell, .sign-label, .sign-role,
+.pdf-footer {
+    font-family: Arial, Helvetica, sans-serif !important;
+}
         body {
-            font-family: 'DejaVu Sans', sans-serif;
+           font-family: Arial, Helvetica, sans-serif;
             font-size: 12px;
             color: #1f2937;
         }
@@ -100,7 +113,7 @@
         /* Empuja las firmas hacia abajo */
         .signatures-wrap {
             margin-top: 80px;
-            /* m√°s espacio para firmar */
+            /* m·s espacio para firmar */
         }
 
         .signatures-table {
@@ -109,7 +122,7 @@
             margin-top: 8px;
         }
 
-        /* Quita bordes y ‚Äúcard look‚Äù */
+        /* Quita bordes y ìcard lookî */
         .signatures-table td {
             border: none !important;
             padding: 0 18px;
@@ -131,7 +144,7 @@
             font-weight: 700;
             color: #111827;
             text-transform: uppercase;
-            /* (2) Nombres en may√∫sculas */
+            /* (2) Nombres en may˙sculas */
 
             .signature-role {
                 margin-top: 2px;
@@ -165,8 +178,8 @@
             <thead>
                 <tr>
                     <th style="width: 40%">Proveedor</th>
-                    <th style="width: 30%">Descripci√≥n</th>
-                    <th style="width: 10%" class="text-center">√Årea</th>
+                    <th style="width: 30%">DescripciÛn</th>
+                    <th style="width: 10%" class="text-center">¡rea</th>
                     <th style="width: 20%" class="text-right">Total</th>
                 </tr>
             </thead>

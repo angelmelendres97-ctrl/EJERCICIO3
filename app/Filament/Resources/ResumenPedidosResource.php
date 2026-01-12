@@ -217,10 +217,52 @@ class ResumenPedidosResource extends Resource
                     ->label('Conexión')
                     ->searchable()
                     ->sortable(),
-                Tables\Columns\TextColumn::make('tipo')
+                Tables\Columns\TextColumn::make('amdg_id_empresa')
+                    ->label('Empresa')
+                    ->sortable()
+                    ->getStateUsing(function (object $record) {
+                        $empresaId = $record->id_empresa;
+                        $amdg_id_empresa = $record->amdg_id_empresa;
+
+                        if (!$empresaId || !$amdg_id_empresa) {
+                            return 'N/A (Faltan IDs)';
+                        }
+
+                        $connectionName = self::getExternalConnectionName($empresaId);
+
+                        if (!$connectionName) {
+                            return 'N/A (No hay conexión)';
+                        }
+
+                        try {
+                            $empresa = DB::connection($connectionName)
+                                ->table('saeempr')
+                                ->where('empr_cod_empr', $amdg_id_empresa)
+                                ->select(DB::raw(" '(' || empr_cod_empr || ') ' || empr_nom_empr AS nombre_empresa"))
+                                ->first();
+
+                            return $empresa->nombre_empresa ?? 'Empresa no encontrada';
+                        } catch (\Exception $e) {
+                            return 'Error DB';
+                        }
+                    })
+                    ->toggleable(),
+                     Tables\Columns\TextColumn::make('tipo')
                     ->label('Presupuesto')
-                    ->searchable()
+                    ->badge()
+                    ->color(fn(string $state): string => match ($state) {
+                        'PB' => 'warning',
+                        'AZ' => 'success',
+                        default => 'gray',
+                    })
+                    ->toggleable()
                     ->sortable(),
+                 Tables\Columns\TextColumn::make('usuario.name')
+                    ->label('Creado Por')
+                    ->sortable()
+                    ->toggleable(),
+
+               
                 Tables\Columns\TextColumn::make('descripcion')
                     ->label('Descripción')
                     ->searchable(),
@@ -250,11 +292,6 @@ class ResumenPedidosResource extends Resource
                     ->openUrlInNewTab(),
                 //Tables\Actions\EditAction::make(),
                 Tables\Actions\DeleteAction::make(),
-            ])
-            ->bulkActions([
-                Tables\Actions\BulkActionGroup::make([
-                    Tables\Actions\DeleteBulkAction::make(),
-                ]),
             ]);
     }
 

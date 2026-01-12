@@ -20,7 +20,7 @@
             width: 100%;
             max-width: 1000px;
             margin: 0 auto;
-            padding: 0px;
+            padding: 0 0 90px;
         }
 
         .header-date {
@@ -38,10 +38,44 @@
             margin-bottom: 10px;
         }
 
+        .company-name {
+            font-size: 32px;
+            /* s�belo a 34/36 si quieres m�s */
+            font-weight: 800;
+            line-height: 1.05;
+            margin-bottom: 6px;
+        }
+
         .header-block .title-main {
-            font-size: 16px;
+            font-size: 18px;
+            /* antes 16px */
             font-weight: 700;
         }
+
+        .doc-line {
+            display: flex;
+            justify-content: center;
+            align-items: baseline;
+            /* alinea bien n�meros/letras grandes */
+            gap: 18px;
+        }
+
+        /* N�mero */
+        .doc-number {
+            font-size: 28px;
+            font-weight: 800;
+            letter-spacing: 1px;
+        }
+
+        /* Presupuesto (AZ / PB) */
+        .doc-type {
+            font-size: 40px;
+            /* mismo tama�o que el n�mero */
+            font-weight: 1000;
+            letter-spacing: 0.5px;
+            text-transform: uppercase;
+        }
+
 
         .header-block .title-sub {
             font-size: 14px;
@@ -101,29 +135,99 @@
             clear: both;
         }
 
+        .signatures {
+            margin-top: 45px;
+        }
+
+        .sign-table {
+            width: 100%;
+            border-collapse: collapse;
+            border: none;
+        }
+
+        .sign-table td {
+            border: none;
+            padding: 0;
+        }
+
+        .sign-cell {
+            width: 50%;
+            text-align: center;
+            padding-top: 35px;
+        }
+
+        .sign-line {
+            border-top: 1px solid #000;
+            width: 80%;
+            margin: 0 auto 6px auto;
+            height: 1px;
+        }
+
+        .sign-label {
+            font-size: 11px;
+            margin-bottom: 3px;
+        }
+
+        .sign-role {
+            font-size: 11px;
+        }
+
         @page {
             size: A4 landscape;
             margin: 20px;
         }
 
         /* FOOTER (USANDO ELEMENTO FIJO + CONTADORES) */
-        /* Este método funciona en dompdf, mpdf y wkhtmltopdf */
+        /* Este m�todo funciona en dompdf, mpdf y wkhtmltopdf */
         .pdf-footer {
             position: fixed;
-            bottom: 10px;       /* distancia desde la parte inferior de la página */
-            right: 20px;        /* alineado a la derecha (cámbialo si quieres centrar) */
+            bottom: 10px;
+            /* distancia desde la parte inferior de la p�gina */
+            right: 20px;
+            /* alineado a la derecha (c�mbialo si quieres centrar) */
             font-size: 12px;
             font-family: Arial, Helvetica, sans-serif;
         }
 
         /* El contenido se genera con :before usando los contadores */
         .pdf-footer .pagenum:before {
-            content: "Pág " counter(page) " / " counter(pages);
+            content: "P�g " counter(page) " / " counter(pages);
         }
 
-        /* Si el motor no soporta counter(pages) mostrará solo el número de página */
+        /* Si el motor no soporta counter(pages) mostrar� solo el n�mero de p�gina */
         .pdf-footer .pagenum-alt:before {
-            content: "Pág " counter(page);
+            content: "P�g " counter(page);
+        }
+
+        .signatures-fixed {
+            position: fixed;
+            bottom: 45px;
+            /* deja espacio para el footer de p�ginas */
+            left: 20px;
+            right: 20px;
+        }
+
+        .signatures-fixed .sign-cell {
+            padding-top: 35px;
+        }
+
+
+        /* L�nea n�mero + presupuesto */
+        .doc-line {
+            display: flex;
+            justify-content: center;
+            /* centra todo el bloque */
+            align-items: center;
+            /* centra verticalmente */
+            gap: 12px;
+            /* espacio entre n�mero y PB */
+        }
+
+
+
+        .doc-line span:first-child {
+            font-size: 18px;
+            font-weight: 700;
         }
     </style>
 </head>
@@ -132,16 +236,20 @@
     <div class="page">
 
         <div class="header-date">
-            <div class="title-sub">Machala,
-                {{ mb_convert_case((new IntlDateFormatter('es_ES', IntlDateFormatter::NONE, IntlDateFormatter::NONE, 'America/Guayaquil', IntlDateFormatter::GREGORIAN, "d 'de' MMMM 'del' yyyy"))->format(new DateTime(date('Y-m-d'))), MB_CASE_TITLE, "UTF-8") }}
+            <div class="title-main">Machala,
+                {{ mb_convert_case(new IntlDateFormatter('es_ES', IntlDateFormatter::NONE, IntlDateFormatter::NONE, 'America/Guayaquil', IntlDateFormatter::GREGORIAN, "d 'de' MMMM 'del' yyyy")->format(new DateTime(date('Y-m-d'))), MB_CASE_TITLE, 'UTF-8') }}
             </div>
         </div>
 
         <div class="header-block">
-            <div class="title-main">{{ $resumen->empresa->nombre_empresa ?? 'Nombre de Empresa no disponible' }}</div>
-            <div class="title-main">{{ str_pad($resumen->id, 8, '0', STR_PAD_LEFT) }}<label
-                    style="font-size: 22px !important"> {{ $resumen->tipo }}</label></div>
+            <div class="company-name">
+                {{ $resumen->empresa->nombre_empresa ?? 'Nombre de Empresa no disponible' }}
+            </div>
 
+            <div class="doc-line">
+                <span class="doc-number">N° {{ str_pad($resumen->codigo_secuencial, 8, '0', STR_PAD_LEFT) }}</span>
+                <span class="doc-type"> {{ $resumen->tipo }}</span>
+            </div>
         </div>
 
         <table>
@@ -152,7 +260,8 @@
                     <th style="width:35px">Proveedor</th>
                     <th style="width:20px">Detalle</th>
                     <th style="width:15px">Pedido</th>
-                    <th style="width:15px">Orden Compra</th>
+                    <th style="width:12px">Num. Factura o Proforma</th>
+                    <th style="width:12px">Orden Compra</th>
                     <th style="width:5px">Total</th>
                 </tr>
             </thead>
@@ -162,7 +271,7 @@
                     $total_oc = 0;
                 @endphp
 
-                @foreach($resumen->detalles as $key => $detalle)
+                @foreach ($resumen->detalles as $key => $detalle)
                     <tr>
                         <td class="center">{{ $key + 1 }}</td>
 
@@ -175,6 +284,7 @@
                         <td class="left">{{ $data_orden_compra->proveedor }}</td>
                         <td class="left">{{ strtoupper($data_orden_compra->observaciones) }}</td>
                         <td class="left">{{ $data_orden_compra->pedidos_importados }}</td>
+                        <td class="left">{{ $data_orden_compra->numero_factura_proforma ?? '' }}</td>
                         <td class="left">{{ str_pad($data_orden_compra->id, 8, '0', STR_PAD_LEFT) }}</td>
                         <td class="right">$ {{ number_format($data_orden_compra->total, 2) }}</td>
                     </tr>
@@ -207,16 +317,56 @@
             <div class="clearfix"></div>
         </div>
 
+        @php
+            $nombreUsuario = $resumen->usuario?->name ?? '';
+            $iniciales = collect(preg_split('/\\s+/', trim($nombreUsuario)))
+                ->filter()
+                ->map(fn($parte) => mb_strtoupper(mb_substr($parte, 0, 1)))
+                ->implode('.');
+            $iniciales = $iniciales ? $iniciales . '.' : '';
+        @endphp
+
+        <div class="signatures-fixed">
+
+            <table class="sign-table">
+                <tr>
+                    <td class="sign-cell">
+                        <div class="sign-line"></div>
+                        <div class="sign-label"><b>ELABORADO POR</b></div>
+                        <div class="sign-role"><b>{{ $iniciales }}</b></div>
+                    </td>
+
+                    <td class="sign-cell">
+                        <div class="sign-line"></div>
+                        <div class="sign-label"><b>REVISADO</b></div>
+                    </td>
+                    <td class="sign-cell">
+                        <div class="sign-line"></div>
+                        <div class="sign-label"><b>REVISADO</b></div>
+                        <div class="sign-role"><b>DR. ZMG</b></div>
+                    </td>
+
+                    <td class="sign-cell">
+                        <div class="sign-line"></div>
+                        <div class="sign-label"><b>RECIBIDO</b></div>
+                    </td>
+
+
+                </tr>
+            </table>
+        </div>
+
     </div>
 
-    <!-- FOOTER FIJO que se repetirá en cada página -->
+    <!-- FOOTER FIJO que se repetir� en cada p�gina -->
     <div class="pdf-footer" aria-hidden="true">
-        <!-- Si su generador soporta counter(pages) se mostrará "Pág X / Y" -->
+        <!-- Si su generador soporta counter(pages) se mostrar� "P�g X / Y" -->
         <span class="pagenum"></span>
-        <!-- Si no, puede usar la alternativa (solo número de página) -->
+        <!-- Si no, puede usar la alternativa (solo n�mero de p�gina) -->
         <span style="display:none" class="pagenum-alt"></span>
     </div>
 
 </body>
+
 
 </html>

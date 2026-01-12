@@ -17,7 +17,7 @@ class ResumenPedidosController extends Controller
     public function descargarPdf(ResumenPedidos $resumenPedidos)
     {
         // Load necessary relationships to avoid N+1 problems.
-        $resumenPedidos->load('detalles', 'empresa');
+        $resumenPedidos->load('detalles', 'empresa', 'usuario');
 
         // The view 'pdfs.resumen_pedidos' will be created.
         $pdf = Pdf::loadView('pdfs.resumen_pedidos', ['resumen' => $resumenPedidos])->setPaper('a4', 'landscape');
