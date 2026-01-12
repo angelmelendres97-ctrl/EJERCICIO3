@@ -31,6 +31,7 @@ class OrdenCompra extends Model
         'total_descuento',
         'total_impuesto',
         'total',
+        'anulada',
     ];
 
     protected $casts = [
@@ -40,6 +41,7 @@ class OrdenCompra extends Model
         'total_descuento' => 'float',
         'total_impuesto' => 'float',
         'total' => 'float',
+        'anulada' => 'boolean',
     ];
 
     // Relación con empresas
