@@ -24,6 +24,7 @@ use Filament\Forms\Components\Section;
 use Filament\Forms\Components\Grid;
 use Filament\Forms\Components\Actions\Action;
 use Filament\Forms\Components\View;
+use Filament\Notifications\Notification;
 use Illuminate\Database\Eloquent\Model; // ESTA LÍNEA ES NECESARIA
 
 class ResumenPedidosResource extends Resource
@@ -31,6 +32,13 @@ class ResumenPedidosResource extends Resource
     protected static ?string $model = ResumenPedidos::class;
 
     protected static ?string $navigationIcon = 'heroicon-o-rectangle-stack';
+
+    protected static function userIsAdmin(): bool
+    {
+        $user = auth()->user();
+
+        return $user?->hasRole('ADMINISTRADOR') ?? false;
+    }
 
     public static function getExternalConnectionName(int $empresaId): ?string
     {
@@ -272,6 +280,9 @@ class ResumenPedidosResource extends Resource
                     ->label('Fecha Creación')
                     ->dateTime('Y-m-d H:i')
                     ->sortable(),
+                Tables\Columns\IconColumn::make('anulada')
+                    ->label('Anulada')
+                    ->boolean(),
             ])
             ->filters([
                 //
@@ -293,9 +304,40 @@ class ResumenPedidosResource extends Resource
                     ->color('success')
                     ->url(fn(ResumenPedidos $record) => route('resumen-pedidos.pdf', $record))
                     ->openUrlInNewTab(),
+                Tables\Actions\Action::make('anular')
+                    ->label('Anular')
+                    ->icon('heroicon-o-x-circle')
+                    ->color('danger')
+                    ->requiresConfirmation()
+                    ->visible(
+                        fn(ResumenPedidos $record) => (auth()->user()->can('Actualizar') || self::userIsAdmin())
+                            && !$record->anulada
+                    )
+                    ->action(function (ResumenPedidos $record) {
+                        $record->update(['anulada' => true]);
+
+                        Notification::make()
+                            ->title('Resumen de pedidos anulado')
+                            ->success()
+                            ->send();
+                    }),
+
                 //Tables\Actions\EditAction::make(),
-                Tables\Actions\DeleteAction::make(),
+                Tables\Actions\DeleteAction::make()
+                    ->visible(fn(ResumenPedidos $record) => self::userIsAdmin())
+                    ->authorize(fn() => self::userIsAdmin())
+                    ->disabled(fn(ResumenPedidos $record) => $record->anulada),
             ]);
+    }
+
+    public static function canEdit(Model $record): bool
+    {
+        return !$record->anulada;
+    }
+
+    public static function canDelete(Model $record): bool
+    {
+        return self::userIsAdmin() && !$record->anulada;
     }
 
     public static function getRelations(): array

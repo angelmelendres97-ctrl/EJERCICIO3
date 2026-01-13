@@ -8,6 +8,7 @@ use Illuminate\Support\Facades\DB;
 use App\Models\PedidoCompra;
 use Illuminate\Support\Facades\Log;
 use Filament\Actions\Action;
+use Filament\Actions;
 
 class EditOrdenCompra extends EditRecord
 {
@@ -17,6 +18,16 @@ class EditOrdenCompra extends EditRecord
     {
         return [
             'pedidos_seleccionados' => 'onPedidosSeleccionados',
+        ];
+    }
+
+    protected function getHeaderActions(): array
+    {
+        return [
+            Actions\DeleteAction::make()
+                ->visible(fn() => OrdenCompraResource::canDelete($this->record))
+                ->authorize(fn() => OrdenCompraResource::canDelete($this->record))
+                ->disabled(fn() => $this->record->anulada),
         ];
     }
 

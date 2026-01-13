@@ -41,6 +41,13 @@ class OrdenCompraResource extends Resource
 
     protected static ?string $navigationIcon = 'heroicon-o-rectangle-stack';
 
+    public static function userIsAdmin(): bool
+    {
+        $user = auth()->user();
+
+        return $user?->hasRole('ADMINISTRADOR') ?? false;
+    }
+
     public static function getExternalConnectionName(int $empresaId): ?string
     {
         $empresa = Empresa::find($empresaId);
@@ -176,7 +183,7 @@ class OrdenCompraResource extends Resource
                         Action::make('importar_pedido')
                             ->label('Importar desde Pedido')
                             ->icon('heroicon-o-magnifying-glass')
-                            
+
                             ->modalContent(function (Get $get) {
                                 $id_empresa = $get('id_empresa');
                                 $amdg_id_empresa = $get('amdg_id_empresa');
@@ -1371,17 +1378,30 @@ class OrdenCompraResource extends Resource
                             ->success()
                             ->send();
                     }),
+
+                Tables\Actions\DeleteAction::make()
+                    ->label('Eliminar')
+                    ->requiresConfirmation()
+                    ->visible(fn(OrdenCompra $record) => self::userIsAdmin())
+                    ->authorize(fn() => self::userIsAdmin())
+                    ->disabled(fn(OrdenCompra $record) => $record->anulada),
+
             ])
             ->bulkActions([
                 // Acciones masivas
                 //Accion masiva para eliminar registros
-                
+
             ]);
     }
 
     public static function canEdit(Model $record): bool
     {
         return auth()->user()->can('Actualizar') && !$record->anulada;
+    }
+
+    public static function canDelete(Model $record): bool
+    {
+        return self::userIsAdmin();
     }
 
     public static function getEloquentQuery(): Builder
