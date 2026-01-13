@@ -41,6 +41,13 @@ class OrdenCompraResource extends Resource
 
     protected static ?string $navigationIcon = 'heroicon-o-rectangle-stack';
 
+    public static function userIsAdmin(): bool
+    {
+        $user = auth()->user();
+
+        return $user?->hasRole('Administrador') ?? false;
+    }
+
     public static function getExternalConnectionName(int $empresaId): ?string
     {
         $empresa = Empresa::find($empresaId);
@@ -1382,6 +1389,11 @@ class OrdenCompraResource extends Resource
     public static function canEdit(Model $record): bool
     {
         return auth()->user()->can('Actualizar') && !$record->anulada;
+    }
+
+    public static function canDelete(Model $record): bool
+    {
+        return self::userIsAdmin();
     }
 
     public static function getEloquentQuery(): Builder

@@ -8,7 +8,6 @@ use Filament\Forms\Concerns\InteractsWithForms;
 use Filament\Forms\Contracts\HasForms;
 use Filament\Tables\Contracts\HasTable;
 use Filament\Tables\Concerns\InteractsWithTable;
-use Filament\Forms\Form;
 use Filament\Forms;
 use Filament\Forms\Get;
 use Filament\Tables\Table;
@@ -44,65 +43,67 @@ class Reporte extends Page implements HasForms, HasTable
         ]);
     }
 
-    public function form(Form $form): Form
+    protected function getForms(): array
     {
-        return $form
-            ->statePath('data')
-            ->schema([
-                Forms\Components\Section::make('Filtros del Reporte')
-                    ->schema([
-                        Forms\Components\Select::make('conexion')
-                            ->label('Conexion')
-                            ->options(Empresa::query()->pluck('nombre_empresa', 'id'))
-                            ->searchable()
-                            ->preload()
-                            ->live(onBlur: true)
-                            ->afterStateUpdated(fn(callable $set) => $set('empresa_id', null)),
-                        Forms\Components\Select::make('empresa_id')
-                            ->label('Empresa')
-                            ->options(function (Get $get) {
-                                $conexion = $get('conexion');
-                                if (!$conexion)
-                                    return [];
-                                $connectionName = PedidoCompraResource::getExternalConnectionName($conexion);
-                                if (!$connectionName)
-                                    return [];
-                                try {
-                                    return DB::connection($connectionName)->table('saeempr')->pluck('empr_nom_empr', 'empr_cod_empr')->all();
-                                } catch (\Exception $e) {
-                                    return [];
-                                }
-                            })
-                            ->searchable()
-                            ->live(onBlur: true)
-                            ->afterStateUpdated(fn(callable $set) => $set('sucursal_id', null)),
-                        Forms\Components\Select::make('sucursal_id')
-                            ->label('Sucursal')
-                            ->options(function (Get $get) {
-                                $conexion = $get('conexion');
-                                $empresaId = $get('empresa_id');
-                                if (!$conexion || !$empresaId)
-                                    return [];
-                                $connectionName = PedidoCompraResource::getExternalConnectionName($conexion);
-                                if (!$connectionName)
-                                    return [];
-                                try {
-                                    return DB::connection($connectionName)->table('saesucu')->where('sucu_cod_empr', $empresaId)->pluck('sucu_nom_sucu', 'sucu_cod_sucu')->all();
-                                } catch (\Exception $e) {
-                                    return [];
-                                }
-                            })
-                            ->searchable()
-                            ->live(onBlur: true),
+        return [
+            'form' => $this->makeForm()
+                ->statePath('data')
+                ->schema([
+                    Forms\Components\Section::make('Filtros del Reporte')
+                        ->schema([
+                            Forms\Components\Select::make('conexion')
+                                ->label('Conexion')
+                                ->options(Empresa::query()->pluck('nombre_empresa', 'id'))
+                                ->searchable()
+                                ->preload()
+                                ->live(onBlur: true)
+                                ->afterStateUpdated(fn(callable $set) => $set('empresa_id', null)),
+                            Forms\Components\Select::make('empresa_id')
+                                ->label('Empresa')
+                                ->options(function (Get $get) {
+                                    $conexion = $get('conexion');
+                                    if (!$conexion)
+                                        return [];
+                                    $connectionName = PedidoCompraResource::getExternalConnectionName($conexion);
+                                    if (!$connectionName)
+                                        return [];
+                                    try {
+                                        return DB::connection($connectionName)->table('saeempr')->pluck('empr_nom_empr', 'empr_cod_empr')->all();
+                                    } catch (\Exception $e) {
+                                        return [];
+                                    }
+                                })
+                                ->searchable()
+                                ->live(onBlur: true)
+                                ->afterStateUpdated(fn(callable $set) => $set('sucursal_id', null)),
+                            Forms\Components\Select::make('sucursal_id')
+                                ->label('Sucursal')
+                                ->options(function (Get $get) {
+                                    $conexion = $get('conexion');
+                                    $empresaId = $get('empresa_id');
+                                    if (!$conexion || !$empresaId)
+                                        return [];
+                                    $connectionName = PedidoCompraResource::getExternalConnectionName($conexion);
+                                    if (!$connectionName)
+                                        return [];
+                                    try {
+                                        return DB::connection($connectionName)->table('saesucu')->where('sucu_cod_empr', $empresaId)->pluck('sucu_nom_sucu', 'sucu_cod_sucu')->all();
+                                    } catch (\Exception $e) {
+                                        return [];
+                                    }
+                                })
+                                ->searchable()
+                                ->live(onBlur: true),
 
-                        Forms\Components\DatePicker::make('fecha_desde')
-                            ->label('Fecha Desde')
-                            ->live(onBlur: true),
-                        Forms\Components\DatePicker::make('fecha_hasta')
-                            ->label('Fecha Hasta')
-                            ->live(onBlur: true),
-                    ])->columns(5),
-            ]);
+                            Forms\Components\DatePicker::make('fecha_desde')
+                                ->label('Fecha Desde')
+                                ->live(onBlur: true),
+                            Forms\Components\DatePicker::make('fecha_hasta')
+                                ->label('Fecha Hasta')
+                                ->live(onBlur: true),
+                        ])->columns(5),
+                ]),
+        ];
     }
 
     public function table(Table $table): Table

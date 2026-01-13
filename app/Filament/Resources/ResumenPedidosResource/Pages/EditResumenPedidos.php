@@ -14,7 +14,9 @@ class EditResumenPedidos extends EditRecord
     protected function getHeaderActions(): array
     {
         return [
-            Actions\DeleteAction::make(),
+            Actions\DeleteAction::make()
+                ->visible(fn() => ResumenPedidosResource::canDelete($this->record))
+                ->authorize(fn() => ResumenPedidosResource::canDelete($this->record)),
         ];
     }
 

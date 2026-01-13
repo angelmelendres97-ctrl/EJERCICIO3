@@ -15,6 +15,11 @@ class ResumenPedidos extends Model
         'codigo_secuencial',
         'tipo',
         'descripcion',
+        'anulada',
+    ];
+
+    protected $casts = [
+        'anulada' => 'boolean',
     ];
 
     // Relación con empresas

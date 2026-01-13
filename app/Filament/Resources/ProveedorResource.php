@@ -16,6 +16,10 @@ use App\Models\Empresa;
 use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\DB;
 use Filament\Forms\Get;
+use Filament\Forms\Set;
+use Filament\Forms\Components\Actions\Action;
+use Filament\Notifications\Notification;
+use Illuminate\Support\Facades\Http;
 
 class ProveedorResource extends Resource
 {
@@ -167,7 +171,74 @@ class ProveedorResource extends Resource
                     Forms\Components\TextInput::make('ruc')
                         ->label('Identificacion')
                         ->required()
-                        ->maxLength(13),
+                        ->maxLength(13)
+                        ->suffixAction(
+                            Action::make('buscar_sri')
+                                ->label('Buscar')
+                                ->icon('heroicon-o-magnifying-glass')
+                                ->action(function (Get $get, Set $set): void {
+                                    $ruc = preg_replace('/\D/', '', (string) $get('ruc'));
+
+                                    if (empty($ruc)) {
+                                        Notification::make()
+                                            ->title('Ingresa un RUC para consultar en el SRI.')
+                                            ->warning()
+                                            ->send();
+                                        return;
+                                    }
+
+                                    $endpoint = config(
+                                        'services.sri.ruc_url',
+                                        'https://srienlinea.sri.gob.ec/sri-web-services/consultas/obtenerPorNumerosRuc'
+                                    );
+
+                                    try {
+                                        $response = Http::timeout(10)->acceptJson()->get($endpoint, ['ruc' => $ruc]);
+                                    } catch (\Exception $exception) {
+                                        Notification::make()
+                                            ->title('No se pudo conectar con el SRI.')
+                                            ->danger()
+                                            ->send();
+                                        return;
+                                    }
+
+                                    if (!$response->ok()) {
+                                        Notification::make()
+                                            ->title('No se encontró información en el SRI.')
+                                            ->danger()
+                                            ->send();
+                                        return;
+                                    }
+
+                                    $payload = $response->json();
+                                    $razonSocial = data_get($payload, 'razonSocial')
+                                        ?? data_get($payload, 'resultado.razonSocial')
+                                        ?? data_get($payload, '0.razonSocial');
+                                    $nombreComercial = data_get($payload, 'nombreComercial')
+                                        ?? data_get($payload, 'resultado.nombreComercial')
+                                        ?? data_get($payload, '0.nombreComercial');
+                                    $agenteRetencion = data_get($payload, 'agenteRetencion')
+                                        ?? data_get($payload, 'resultado.agenteRetencion')
+                                        ?? data_get($payload, '0.agenteRetencion');
+
+                                    if (empty($razonSocial)) {
+                                        Notification::make()
+                                            ->title('Respuesta del SRI sin razón social.')
+                                            ->warning()
+                                            ->send();
+                                        return;
+                                    }
+
+                                    $set('nombre', $razonSocial);
+                                    $set('nombre_comercial', $nombreComercial ?: $razonSocial);
+                                    $set('aplica_retencion_sn', in_array(strtoupper((string) $agenteRetencion), ['S', 'SI', 'TRUE', '1'], true));
+
+                                    Notification::make()
+                                        ->title('Datos del SRI cargados.')
+                                        ->success()
+                                        ->send();
+                                })
+                        ),
 
                     Forms\Components\TextInput::make('nombre')
                         ->label('Nombre')
@@ -183,8 +254,27 @@ class ProveedorResource extends Resource
                         ->label('Nombre Comercial')
                         ->required()
                         ->maxLength(255),
+
+                    Forms\Components\TextInput::make('telefono')
+                        ->label('Telefono')
+                        ->required()
+                        ->maxLength(20),
+
+                    Forms\Components\TextInput::make('correo')
+                        ->label('Email')
+                        ->required()
+                        ->maxLength(255),
+
+                    Forms\Components\TextInput::make('direcccion')
+                        ->label('Dirección')
+                        ->required()
+                        ->maxLength(255),
+
+                    Forms\Components\Toggle::make('aplica_retencion_sn')
+                        ->label('¿Aplica Retención?')
+                        ->default(false),
                 ])
-                ->columns(2),
+                ->columns(3),
 
             Forms\Components\Section::make('Clasificación')
                 ->schema([
@@ -417,35 +507,7 @@ class ProveedorResource extends Resource
                         ->live()
                         ->required(),
                 ])
-                ->columns(2),
-
-            Forms\Components\Section::make('Retención')
-                ->schema([
-                    Forms\Components\Toggle::make('aplica_retencion_sn')
-                        ->label('¿Aplica Retención?')
-                        ->default(false),
-                ]),
-
-            Forms\Components\Section::make('Informacion Adicional')
-                ->schema([
-
-                    Forms\Components\TextInput::make('telefono')
-                        ->label('Telefono')
-                        ->required()
-                        ->maxLength(20),
-
-                    Forms\Components\TextInput::make('correo')
-                        ->label('Email')
-                        ->required()
-                        ->maxLength(255),
-
-                    Forms\Components\TextInput::make('direcccion')
-                        ->label('Dirección')
-                        ->required()
-                        ->maxLength(255),
-
-                ])
-                ->columns(2),
+                ->columns(3),
 
             Forms\Components\Section::make('Empresas')
                 ->schema([
