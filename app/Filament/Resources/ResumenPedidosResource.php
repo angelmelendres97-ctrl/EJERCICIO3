@@ -180,7 +180,10 @@ class ResumenPedidosResource extends Resource
                                     return;
                                 }
 
-                                $ordenesExistentes = \App\Models\DetalleResumenPedidos::pluck('id_orden_compra')->all();
+                                $ordenesExistentes = \App\Models\DetalleResumenPedidos::query()
+                                    ->whereHas('resumenPedido', fn ($query) => $query->where('anulada', false))
+                                    ->pluck('id_orden_compra')
+                                    ->all();
 
                                 $query = \App\Models\OrdenCompra::query()
                                     ->where('id_empresa', $id_empresa)

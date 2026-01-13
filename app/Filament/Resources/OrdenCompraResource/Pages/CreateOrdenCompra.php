@@ -178,7 +178,7 @@ class CreateOrdenCompra extends CreateRecord
                 $productoNombre = 'Producto no encontrado';
                 $codigoProducto = $detalle->codigo_producto_estandar ?? $detalle->dped_cod_prod;
 
-                if (!$detalle->es_servicio && !empty($codigoProducto)) {
+                if (!empty($codigoProducto)) {
                     $productData = DB::connection($connectionName)
                         ->table('saeprod')
                         ->join('saeprbo', 'prbo_cod_prod', '=', 'prod_cod_prod')
@@ -225,10 +225,14 @@ class CreateOrdenCompra extends CreateRecord
                     ])->filter()->implode(' | '));
                 }
 
+                $productoLinea = $detalle->es_servicio
+                    ? ($detalle->servicio_nombre ?? $productoNombre)
+                    : $productoNombre;
+
                 return [
                     'id_bodega' => $id_bodega_item, // Set the correct warehouse for this line
-                    'codigo_producto' => $detalle->es_servicio ? null : $codigoProducto,
-                    'producto' => $detalle->es_servicio ? null : $productoNombre,
+                    'codigo_producto' => $codigoProducto,
+                    'producto' => $productoLinea,
                     'es_auxiliar' => $detalle->es_auxiliar,
                     'es_servicio' => $detalle->es_servicio,
                     'producto_auxiliar' => $auxiliarDescripcion,
