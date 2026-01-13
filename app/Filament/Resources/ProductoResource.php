@@ -375,7 +375,7 @@ class ProductoResource extends Resource
                 Forms\Components\Section::make('Información Producto')
                     ->schema([
                         Forms\Components\TextInput::make('sku')
-                            ->label('SKU')
+                            ->label('Codigo')
                             ->required()
                             ->unique(ignoreRecord: true)
                             ->maxLength(255),

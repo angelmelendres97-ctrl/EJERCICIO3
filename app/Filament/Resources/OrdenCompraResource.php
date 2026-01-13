@@ -176,6 +176,7 @@ class OrdenCompraResource extends Resource
                         Action::make('importar_pedido')
                             ->label('Importar desde Pedido')
                             ->icon('heroicon-o-magnifying-glass')
+                            
                             ->modalContent(function (Get $get) {
                                 $id_empresa = $get('id_empresa');
                                 $amdg_id_empresa = $get('amdg_id_empresa');
@@ -1112,6 +1113,9 @@ class OrdenCompraResource extends Resource
     public static function table(Table $table): Table
     {
         return $table
+            ->defaultSort('created_at', 'desc')
+            ->actionsPosition(\Filament\Tables\Enums\ActionsPosition::BeforeColumns)
+
             ->columns([
 
                 Tables\Columns\TextColumn::make('id')
@@ -1121,7 +1125,8 @@ class OrdenCompraResource extends Resource
 
                 Tables\Columns\TextColumn::make('empresa.nombre_empresa')
                     ->label('Conexión')
-                    ->sortable(),
+                    ->sortable()
+                    ->toggleable(isToggledHiddenByDefault: true),
 
                 Tables\Columns\TextColumn::make('numero_factura_proforma')
                     ->label('N° Fact/Proforma')
@@ -1132,6 +1137,7 @@ class OrdenCompraResource extends Resource
                 Tables\Columns\TextColumn::make('amdg_id_empresa')
                     ->label('Empresa')
                     ->sortable()
+                    ->searchable()
                     ->getStateUsing(function (object $record) {
                         $empresaId = $record->id_empresa;
                         $amdg_id_empresa = $record->amdg_id_empresa;
@@ -1167,11 +1173,16 @@ class OrdenCompraResource extends Resource
                         'AZ' => 'success',
                         default => 'gray',
                     })
-                    ->toggleable(isToggledHiddenByDefault: true)
+                    ->toggleable()
+                    ->sortable(),
+
+                Tables\Columns\TextColumn::make('pedidos_importados')
+                    ->label('Pedidos Importados')
                     ->sortable(),
                 Tables\Columns\TextColumn::make('amdg_id_sucursal')
                     ->label('Sucursal')
                     ->sortable()
+                    ->searchable()
                     ->getStateUsing(function (object $record) {
                         $empresaId = $record->id_empresa;
                         $amdg_id_sucursal = $record->amdg_id_sucursal;
@@ -1211,32 +1222,37 @@ class OrdenCompraResource extends Resource
 
                 Tables\Columns\TextColumn::make('usuario.name')
                     ->label('Creado Por')
+                    ->searchable()
                     ->sortable()
-                    ->toggleable(),
+                    ->toggleable(isToggledHiddenByDefault: true),
 
                 Tables\Columns\TextColumn::make('trasanccion')
                     ->label('Transacción')
                     ->searchable()
-                    ->sortable(),
+                    ->sortable()
+                    ->toggleable(isToggledHiddenByDefault: true),
 
                 Tables\Columns\TextColumn::make('fecha_pedido')
                     ->date()
                     ->label('F. Pedido')
-                    ->sortable(),
+                    ->sortable()
+                    ->toggleable(isToggledHiddenByDefault: true),
 
                 Tables\Columns\TextColumn::make('fecha_entrega')
                     ->date()
                     ->label('F. Entrega')
-                    ->sortable(),
+                    ->sortable()
+                    ->toggleable(isToggledHiddenByDefault: true),
 
                 Tables\Columns\TextColumn::make('uso_compra')
                     ->label('Uso Compra')
-                    ->toggleable()
+                    ->toggleable(isToggledHiddenByDefault: true)
                     ->sortable(),
 
                 Tables\Columns\TextColumn::make('solicitado_por')
                     ->label('Solicitado Por')
-                    ->toggleable()
+                    ->toggleable(isToggledHiddenByDefault: true)
+                    ->searchable()
                     ->sortable(),
 
                 Tables\Columns\TextColumn::make('formato')
@@ -1280,7 +1296,7 @@ class OrdenCompraResource extends Resource
 
 
                 Tables\Columns\TextColumn::make('observaciones')
-                    ->toggleable(isToggledHiddenByDefault: true),
+                    ->toggleable(),
 
                 Tables\Columns\TextColumn::make('subtotal')
                     ->money('USD')
@@ -1304,11 +1320,13 @@ class OrdenCompraResource extends Resource
                 Tables\Columns\TextColumn::make('resumenDetalle.resumenPedido.descripcion')
                     ->label('Grupo Resumen')
                     ->getStateUsing(fn(OrdenCompra $record) => $record->resumenDetalle?->resumenPedido?->descripcion ?? 'Sin grupo de resumen')
-                    ->toggleable(),
+                    ->toggleable(isToggledHiddenByDefault: true),
 
-                Tables\Columns\TextColumn::make('pedidos_importados')
-                    ->label('Pedidos Importados')
-                    ->sortable(),
+
+
+                Tables\Columns\IconColumn::make('anulada')
+                    ->label('Anulada')
+                    ->boolean(),
             ])
             ->filters([
                 // Aquí puedes añadir filtros si es necesario
@@ -1338,18 +1356,32 @@ class OrdenCompraResource extends Resource
                 //     ->modalSubmitAction(false)
                 //     ->modalCancelAction(fn(StaticAction $action) => $action->label('Cerrar')),
 
-                Tables\Actions\EditAction::make()
-                    ->visible(fn() => auth()->user()->can('Actualizar')),
 
-                Tables\Actions\DeleteAction::make()
-                    ->visible(fn() => auth()->user()->can('Borrar'))
-                    ->after(function ($record) {
-                        \App\Services\OrdenCompraSyncService::eliminar($record);
+                Tables\Actions\Action::make('anular')
+                    ->label('Anular')
+                    ->icon('heroicon-o-x-circle')
+                    ->color('danger')
+                    ->requiresConfirmation()
+                    ->visible(fn(OrdenCompra $record) => auth()->user()->can('Actualizar') && !$record->anulada)
+                    ->action(function (OrdenCompra $record) {
+                        $record->update(['anulada' => true]);
+
+                        Notification::make()
+                            ->title('Orden de compra anulada')
+                            ->success()
+                            ->send();
                     }),
             ])
             ->bulkActions([
                 // Acciones masivas
+                //Accion masiva para eliminar registros
+                
             ]);
+    }
+
+    public static function canEdit(Model $record): bool
+    {
+        return auth()->user()->can('Actualizar') && !$record->anulada;
     }
 
     public static function getEloquentQuery(): Builder

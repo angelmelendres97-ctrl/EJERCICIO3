@@ -178,7 +178,8 @@ class ResumenPedidosResource extends Resource
                                     ->where('id_empresa', $id_empresa)
                                     ->where('amdg_id_empresa', $amdg_id_empresa)
                                     ->where('amdg_id_sucursal', $amdg_id_sucursal)
-                                    ->whereNotIn('id', $ordenesExistentes);
+                                    ->whereNotIn('id', $ordenesExistentes)
+                                    ->where('anulada', false);
 
                                 if (!empty($fecha_desde) && !empty($fecha_hasta)) {
                                     $query->whereBetween('fecha_pedido', [$fecha_desde, $fecha_hasta]);
@@ -207,6 +208,7 @@ class ResumenPedidosResource extends Resource
     public static function table(Table $table): Table
     {
         return $table
+            ->actionsPosition(\Filament\Tables\Enums\ActionsPosition::BeforeColumns)
             ->columns([
                 Tables\Columns\TextColumn::make('codigo_secuencial')
                     ->label('Secuencial')
@@ -247,7 +249,7 @@ class ResumenPedidosResource extends Resource
                         }
                     })
                     ->toggleable(),
-                     Tables\Columns\TextColumn::make('tipo')
+                Tables\Columns\TextColumn::make('tipo')
                     ->label('Presupuesto')
                     ->badge()
                     ->color(fn(string $state): string => match ($state) {
@@ -257,12 +259,12 @@ class ResumenPedidosResource extends Resource
                     })
                     ->toggleable()
                     ->sortable(),
-                 Tables\Columns\TextColumn::make('usuario.name')
+                Tables\Columns\TextColumn::make('usuario.name')
                     ->label('Creado Por')
                     ->sortable()
                     ->toggleable(),
 
-               
+
                 Tables\Columns\TextColumn::make('descripcion')
                     ->label('Descripción')
                     ->searchable(),
@@ -274,6 +276,7 @@ class ResumenPedidosResource extends Resource
             ->filters([
                 //
             ])
+            ->defaultSort('created_at', 'desc')
             ->actions([
                 Tables\Actions\Action::make('ver_ordenes')
                     ->label('Ver Órdenes')
