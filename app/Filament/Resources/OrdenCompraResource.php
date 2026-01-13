@@ -1114,7 +1114,7 @@ class OrdenCompraResource extends Resource
     {
         return $table
             ->defaultSort('created_at', 'desc')
-            ->actionsPosition(\Filament\Tables\Enums\ActionsPosition::BeforeColumns) // ✅ acciones al inicio
+            ->actionsPosition(\Filament\Tables\Enums\ActionsPosition::BeforeColumns)
 
             ->columns([
 
@@ -1374,6 +1374,8 @@ class OrdenCompraResource extends Resource
             ])
             ->bulkActions([
                 // Acciones masivas
+                //Accion masiva para eliminar registros
+                
             ]);
     }
 

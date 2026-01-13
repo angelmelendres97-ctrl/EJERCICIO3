@@ -16,7 +16,7 @@
                         <th scope="col" class="px-6 py-3">Proveedor</th>
                         <th scope="col" class="px-6 py-3">Fecha</th>
                         <th scope="col" class="px-6 py-3 text-right">Total</th>
-                        <th scope="col" class="px-6 py-3 text-center">Acciones</th>
+                       {{--  <th scope="col" class="px-6 py-3 text-center">Acciones</th> --}}
                     </tr>
                 </thead>
                 <tbody>
@@ -32,13 +32,13 @@
                             </td>
                             <td class="px-6 py-4 text-right">{{ number_format($detalle->ordenCompra->total, 2) }}</td>
 
-                            <td class="px-6 py-4 text-center">
+                           {{--  <td class="px-6 py-4 text-center">
                                 <button type="button" wire:click="deleteDetalle({{ $detalle->id }})"
                                     wire:confirm="¿Está seguro de que desea eliminar este registro?"
                                     class="text-red-600 hover:text-red-900">
                                     Eliminar
                                 </button>
-                            </td>
+                            </td> --}}
                         </tr>
                     @endforeach
                 </tbody>

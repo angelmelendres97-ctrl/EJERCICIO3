@@ -68,7 +68,7 @@ class OrdenCompraSyncService
             $total = $data['total'];
 
             $fecha_server = date('Y-m-d H:i:s');
-            $id_usuario = Auth::id() ?? 1;
+            $id_usuario = 1;
             $plazo = 0;
             $empleado = 0;
             $factura = null;
