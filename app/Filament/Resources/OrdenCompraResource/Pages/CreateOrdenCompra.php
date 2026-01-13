@@ -178,7 +178,7 @@ class CreateOrdenCompra extends CreateRecord
                 $productoNombre = 'Producto no encontrado';
                 $codigoProducto = $detalle->codigo_producto_estandar ?? $detalle->dped_cod_prod;
 
-                if (!$detalle->es_servicio && !empty($codigoProducto)) {
+                if (!empty($codigoProducto)) {
                     $productData = DB::connection($connectionName)
                         ->table('saeprod')
                         ->join('saeprbo', 'prbo_cod_prod', '=', 'prod_cod_prod')
@@ -217,23 +217,31 @@ class CreateOrdenCompra extends CreateRecord
                 }
 
                 $servicioDescripcion = null;
+                $servicioData = null;
 
                 if ($detalle->es_servicio) {
                     $servicioDescripcion = trim(collect([
                         $detalle->dped_cod_prod ? 'Código servicio: ' . $detalle->dped_cod_prod : null,
                         $detalle->servicio_nombre ? 'Descripción: ' . $detalle->servicio_nombre : null,
                     ])->filter()->implode(' | '));
+
+                    $servicioData = [
+                        'codigo' => $detalle->dped_cod_prod,
+                        'descripcion' => $detalle->servicio_nombre,
+                    ];
                 }
 
                 return [
                     'id_bodega' => $id_bodega_item, // Set the correct warehouse for this line
-                    'codigo_producto' => $detalle->es_servicio ? null : $codigoProducto,
-                    'producto' => $detalle->es_servicio ? null : $productoNombre,
+                    'codigo_producto' => $codigoProducto,
+                    'producto' => $productoNombre,
                     'es_auxiliar' => $detalle->es_auxiliar,
                     'es_servicio' => $detalle->es_servicio,
                     'producto_auxiliar' => $auxiliarDescripcion,
                     'producto_servicio' => $servicioDescripcion,
-                    'detalle' => $auxiliarData ? json_encode($auxiliarData, JSON_UNESCAPED_UNICODE) : null,
+                    'detalle' => $auxiliarData
+                        ? json_encode($auxiliarData, JSON_UNESCAPED_UNICODE)
+                        : ($servicioData ? json_encode($servicioData, JSON_UNESCAPED_UNICODE) : null),
 
                     'cantidad' => $detalle->cantidad_pendiente,
                     'costo' => $costo,
