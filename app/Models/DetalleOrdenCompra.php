@@ -10,6 +10,8 @@ class DetalleOrdenCompra extends Model
     // 4. Campos que se pueden asignar masivamente
     protected $fillable = [
         'id_orden_compra',
+        'pedido_codigo',
+        'pedido_detalle_id',
         'id_bodega',
         'bodega',
         'codigo_producto',
@@ -30,6 +32,8 @@ class DetalleOrdenCompra extends Model
         'descuento' => 'float',
         'impuesto' => 'float',
         'valor_impuesto' => 'float',
+        'pedido_codigo' => 'integer',
+        'pedido_detalle_id' => 'integer',
     ];
 
     /**

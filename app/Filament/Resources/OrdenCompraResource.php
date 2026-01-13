@@ -544,6 +544,8 @@ class OrdenCompraResource extends Resource
                                         Forms\Components\Hidden::make('es_auxiliar'),
                                         Forms\Components\Hidden::make('es_servicio'),
                                         Forms\Components\Hidden::make('detalle'),
+                                        Forms\Components\Hidden::make('pedido_codigo'),
+                                        Forms\Components\Hidden::make('pedido_detalle_id'),
 
                                         Forms\Components\TextInput::make('producto_auxiliar')
                                             ->label('Producto auxiliar')
