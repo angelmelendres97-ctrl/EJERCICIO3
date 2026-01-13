@@ -112,7 +112,10 @@ class EditOrdenCompra extends EditRecord
         })->where('cantidad_pendiente', '>', 0);
 
         if ($detallesAgrupados->isNotEmpty()) {
-            $repeaterItems = $detallesAgrupados->map(function ($detalle) use ($connectionName) {
+            $existingItems = array_filter($this->data['detalles'] ?? [], fn($item) => !empty($item['codigo_producto']));
+            $existingQuantities = $this->buildExistingDetalleQuantities($existingItems);
+
+            $repeaterItems = $detallesAgrupados->map(function ($detalle) use ($connectionName, $existingQuantities) {
                 $id_bodega_item = $detalle->dped_cod_bode;
 
                 $costo = 0;
@@ -139,8 +142,6 @@ class EditOrdenCompra extends EditRecord
                         $productoNombre = $productData->prod_nom_prod . ' (' . $codigoProducto . ')';
                     }
                 }
-
-                $valor_impuesto = (floatval($detalle->cantidad_pendiente) * floatval($costo)) * (floatval($impuesto) / 100);
 
                 $auxiliarDescripcion = null;
                 $auxiliarData = null;
@@ -170,6 +171,25 @@ class EditOrdenCompra extends EditRecord
                     ? ($detalle->servicio_nombre ?? $productoNombre)
                     : $productoNombre;
 
+                $detalleKey = $this->buildDetalleKey([
+                    'codigo_producto' => $codigoProducto,
+                    'id_bodega' => $id_bodega_item,
+                    'es_auxiliar' => $detalle->es_auxiliar,
+                    'es_servicio' => $detalle->es_servicio,
+                    'detalle' => $auxiliarData ? json_encode($auxiliarData, JSON_UNESCAPED_UNICODE) : null,
+                    'producto_auxiliar' => $auxiliarDescripcion,
+                    'producto_servicio' => $servicioDescripcion,
+                    'producto' => $productoLinea,
+                ]);
+
+                $cantidadPendiente = floatval($detalle->cantidad_pendiente) - ($existingQuantities[$detalleKey] ?? 0);
+
+                if ($cantidadPendiente <= 0) {
+                    return null;
+                }
+
+                $valor_impuesto = ($cantidadPendiente * floatval($costo)) * (floatval($impuesto) / 100);
+
                 return [
                     'id_bodega' => $id_bodega_item,
                     'codigo_producto' => $codigoProducto,
@@ -179,16 +199,14 @@ class EditOrdenCompra extends EditRecord
                     'producto_auxiliar' => $auxiliarDescripcion,
                     'producto_servicio' => $servicioDescripcion,
                     'detalle' => $auxiliarData ? json_encode($auxiliarData, JSON_UNESCAPED_UNICODE) : null,
-                    'cantidad' => $detalle->cantidad_pendiente,
+                    'cantidad' => $cantidadPendiente,
                     'costo' => $costo,
                     'descuento' => 0,
                     'impuesto' => $impuesto,
                     'valor_impuesto' => number_format($valor_impuesto, 6, '.', ''),
                 ];
-            })->values()->toArray();
+            })->filter()->values()->toArray();
 
-            // Filter out blank rows from existing details before merging
-            $existingItems = array_filter($this->data['detalles'] ?? [], fn($item) => !empty($item['codigo_producto']));
             $this->data['detalles'] = array_merge($existingItems, $repeaterItems);
             
             // Recalculate totals after merging
@@ -256,6 +274,37 @@ class EditOrdenCompra extends EditRecord
             ->filter(fn($pedido) => $pedido > 0)
             ->values()
             ->all();
+    }
+
+    private function buildExistingDetalleQuantities(array $detalles): array
+    {
+        $quantities = [];
+
+        foreach ($detalles as $detalle) {
+            $key = $this->buildDetalleKey($detalle);
+            $quantities[$key] = ($quantities[$key] ?? 0) + floatval($detalle['cantidad'] ?? 0);
+        }
+
+        return $quantities;
+    }
+
+    private function buildDetalleKey(array $detalle): string
+    {
+        $codigoProducto = (string) ($detalle['codigo_producto'] ?? '');
+        $bodega = (string) ($detalle['id_bodega'] ?? '');
+        $esAuxiliar = !empty($detalle['es_auxiliar']);
+        $esServicio = !empty($detalle['es_servicio']);
+
+        $tipo = $esAuxiliar ? 'aux' : ($esServicio ? 'serv' : 'prod');
+        $extra = '';
+
+        if ($esAuxiliar) {
+            $extra = (string) ($detalle['detalle'] ?? $detalle['producto_auxiliar'] ?? '');
+        } elseif ($esServicio) {
+            $extra = (string) ($detalle['producto_servicio'] ?? $detalle['producto'] ?? '');
+        }
+
+        return implode('|', [$codigoProducto, $bodega, $tipo, $extra]);
     }
 
     private function applySolicitadoPor(string $connectionName, array $pedidos): void
