@@ -37,7 +37,7 @@ class ResumenPedidosResource extends Resource
     {
         $user = auth()->user();
 
-        return $user?->hasRole('Administrador') ?? false;
+        return $user?->hasRole('ADMINISTRADOR') ?? false;
     }
 
     public static function getExternalConnectionName(int $empresaId): ?string
@@ -309,12 +309,11 @@ class ResumenPedidosResource extends Resource
                     ->icon('heroicon-o-x-circle')
                     ->color('danger')
                     ->requiresConfirmation()
-                    ->visible(fn(ResumenPedidos $record) => self::userIsAdmin() && !$record->anulada)
+                    ->visible(
+                        fn(ResumenPedidos $record) => (auth()->user()->can('Actualizar') || self::userIsAdmin())
+                            && !$record->anulada
+                    )
                     ->action(function (ResumenPedidos $record) {
-                        if (!self::userIsAdmin()) {
-                            abort(403);
-                        }
-
                         $record->update(['anulada' => true]);
 
                         Notification::make()
@@ -322,6 +321,7 @@ class ResumenPedidosResource extends Resource
                             ->success()
                             ->send();
                     }),
+
                 //Tables\Actions\EditAction::make(),
                 Tables\Actions\DeleteAction::make()
                     ->visible(fn(ResumenPedidos $record) => self::userIsAdmin())

@@ -179,24 +179,24 @@ class ProveedorResource extends Resource
                                 ->action(function (Get $get, Set $set): void {
                                     $ruc = preg_replace('/\D/', '', (string) $get('ruc'));
 
-                                    if (empty($ruc)) {
+                                    if (!$ruc || strlen($ruc) < 10) {
                                         Notification::make()
-                                            ->title('Ingresa un RUC para consultar en el SRI.')
+                                            ->title('Ingresa un RUC/Cédula válido para consultar en el SRI.')
                                             ->warning()
                                             ->send();
                                         return;
                                     }
 
-                                    $endpoint = config(
-                                        'services.sri.ruc_url',
-                                        'https://srienlinea.sri.gob.ec/sri-web-services/consultas/obtenerPorNumerosRuc'
-                                    );
+                                    $endpoint = 'https://srienlinea.sri.gob.ec/sri-catastro-sujeto-servicio-internet/rest/ConsolidadoContribuyente/obtenerPorNumerosRuc';
 
                                     try {
-                                        $response = Http::timeout(10)->acceptJson()->get($endpoint, ['ruc' => $ruc]);
-                                    } catch (\Exception $exception) {
+                                        $response = Http::timeout(15)
+                                            ->acceptJson()
+                                            ->get($endpoint, ['ruc' => $ruc]);
+                                    } catch (\Throwable $e) {
                                         Notification::make()
                                             ->title('No se pudo conectar con el SRI.')
+                                            ->body($e->getMessage())
                                             ->danger()
                                             ->send();
                                         return;
@@ -204,41 +204,65 @@ class ProveedorResource extends Resource
 
                                     if (!$response->ok()) {
                                         Notification::make()
-                                            ->title('No se encontró información en el SRI.')
+                                            ->title('El SRI no respondió correctamente.')
+                                            ->body('Código: ' . $response->status())
                                             ->danger()
                                             ->send();
                                         return;
                                     }
 
                                     $payload = $response->json();
-                                    $razonSocial = data_get($payload, 'razonSocial')
-                                        ?? data_get($payload, 'resultado.razonSocial')
-                                        ?? data_get($payload, '0.razonSocial');
-                                    $nombreComercial = data_get($payload, 'nombreComercial')
-                                        ?? data_get($payload, 'resultado.nombreComercial')
-                                        ?? data_get($payload, '0.nombreComercial');
-                                    $agenteRetencion = data_get($payload, 'agenteRetencion')
-                                        ?? data_get($payload, 'resultado.agenteRetencion')
-                                        ?? data_get($payload, '0.agenteRetencion');
 
-                                    if (empty($razonSocial)) {
+                                    // La respuesta real viene como: [ { ... } ]
+                                    $data = is_array($payload) ? ($payload[0] ?? null) : $payload;
+
+                                    if (!is_array($data)) {
                                         Notification::make()
-                                            ->title('Respuesta del SRI sin razón social.')
+                                            ->title('Respuesta del SRI inesperada.')
                                             ->warning()
                                             ->send();
                                         return;
                                     }
 
+                                    $razonSocial      = data_get($data, 'razonSocial');
+                                    $numeroRuc        = data_get($data, 'numeroRuc');
+                                    $agenteRetencion  = data_get($data, 'agenteRetencion'); // "SI" / "NO"
+                                    $estadoRuc        = data_get($data, 'estadoContribuyenteRuc'); // "ACTIVO"
+                                    $obligadoConta    = data_get($data, 'obligadoLlevarContabilidad'); // "SI"/"NO"
+                                    $tipoContrib      = data_get($data, 'tipoContribuyente');
+                                    $actividad        = data_get($data, 'actividadEconomicaPrincipal');
+
+                                    if (empty($razonSocial)) {
+                                        Notification::make()
+                                            ->title('No se encontró razón social en la respuesta del SRI.')
+                                            ->warning()
+                                            ->send();
+                                        return;
+                                    }
+
+                                    $toBoolSiNo = fn($v) => in_array(strtoupper(trim((string) $v)), ['SI', 'S', 'TRUE', '1'], true);
+
+                                    // Autollenado principal
+                                    $set('ruc', $numeroRuc ?: $ruc);
                                     $set('nombre', $razonSocial);
-                                    $set('nombre_comercial', $nombreComercial ?: $razonSocial);
-                                    $set('aplica_retencion_sn', in_array(strtoupper((string) $agenteRetencion), ['S', 'SI', 'TRUE', '1'], true));
+                                    $set('nombre_comercial', $razonSocial);
+
+                                    // Retención (según SRI)
+                                    $set('aplica_retencion_sn', $toBoolSiNo($agenteRetencion));
+
+                                    // Si tienes campos adicionales, aquí los puedes setear (si existen en tu tabla/form)
+                                    // $set('estado_sri', $estadoRuc);
+                                    // $set('tipo_contribuyente', $tipoContrib);
+                                    // $set('obligado_contabilidad_sn', $toBoolSiNo($obligadoConta));
+                                    // $set('actividad_economica', $actividad);
 
                                     Notification::make()
-                                        ->title('Datos del SRI cargados.')
+                                        ->title('Datos del SRI cargados correctamente.')
                                         ->success()
                                         ->send();
                                 })
                         ),
+
 
                     Forms\Components\TextInput::make('nombre')
                         ->label('Nombre')
@@ -724,11 +748,14 @@ class ProveedorResource extends Resource
                     ->visible(fn() => auth()->user()->can('Actualizar')),
                 Tables\Actions\DeleteAction::make()
                     ->visible(fn() => auth()->user()->can('Borrar')),
-            ])
-            ->bulkActions([
-                Tables\Actions\DeleteBulkAction::make()
-                    ->visible(fn() => auth()->user()->can('Borrar')),
-            ]
+            
+                    ])
+            
+            ->bulkActions(
+                [
+                    Tables\Actions\DeleteBulkAction::make()
+                        ->visible(fn() => auth()->user()->can('Borrar')),
+                ]
             );
     }
 

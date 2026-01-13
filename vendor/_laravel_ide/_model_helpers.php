@@ -2600,6 +2600,7 @@ namespace App\Models {
     /**
      * App\Models\OrdenCompra
      *
+     * @property boolean $anulada
      * @property int|null $id_usuario
      * @property string|null $nombre_reembolso
      * @property string|null $numero_factura_proforma
@@ -2657,6 +2658,7 @@ namespace App\Models {
      * @method static \Illuminate\Database\Eloquent\Builder<OrdenCompra>|OrdenCompra whereNumeroFacturaProforma($value)
      * @method static \Illuminate\Database\Eloquent\Builder<OrdenCompra>|OrdenCompra whereNombreReembolso($value)
      * @method static \Illuminate\Database\Eloquent\Builder<OrdenCompra>|OrdenCompra whereIdUsuario($value)
+     * @method static \Illuminate\Database\Eloquent\Builder<OrdenCompra>|OrdenCompra whereAnulada($value)
      * @method static \Illuminate\Database\Eloquent\Builder<OrdenCompra>|OrdenCompra newModelQuery()
      * @method static \Illuminate\Database\Eloquent\Builder<OrdenCompra>|OrdenCompra newQuery()
      * @method static \Illuminate\Database\Eloquent\Builder<OrdenCompra>|OrdenCompra query()
