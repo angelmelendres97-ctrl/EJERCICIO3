@@ -26,6 +26,7 @@ use Filament\Forms\Components\Section;
 use Filament\Forms\Components\Grid;
 use Filament\Forms\Components\Wizard;
 use Filament\Forms\Components\Wizard\Step;
+use Filament\Tables\Filters\Filter;
 
 use Filament\Forms\Components\Actions\Action;
 use Filament\Forms\Components\Actions;
@@ -230,7 +231,10 @@ class OrdenCompraResource extends Resource
                             ->label(fn(Get $get) => $get('formato') === 'P' ? 'Número de proforma' : 'Número de factura')
                             ->helperText('Ingrese el número según el formato seleccionado.')
                             ->visible(fn(Get $get) => filled($get('formato')))
-                            ->maxLength(255),
+                            ->maxLength(255)->wrap()
+                            ->extraAttributes([
+                                'style' => 'max-width: 220px; white-space: normal; word-break: break-word;',
+                            ]),
 
                         Forms\Components\Select::make(name: 'tipo_oc')
                             ->label('Tipo Orden Compra:')
@@ -544,6 +548,8 @@ class OrdenCompraResource extends Resource
                                         Forms\Components\Hidden::make('es_auxiliar'),
                                         Forms\Components\Hidden::make('es_servicio'),
                                         Forms\Components\Hidden::make('detalle'),
+                                        Forms\Components\Hidden::make('pedido_codigo'),
+                                        Forms\Components\Hidden::make('pedido_detalle_id'),
 
                                         Forms\Components\TextInput::make('producto_auxiliar')
                                             ->label('Producto auxiliar')
@@ -1134,7 +1140,21 @@ class OrdenCompraResource extends Resource
                     ->label('Conexión')
                     ->sortable()
                     ->toggleable(isToggledHiddenByDefault: true),
-
+                Tables\Columns\TextColumn::make('formato')
+                    ->label('Formato')
+                    ->badge()
+                    ->formatStateUsing(fn(string $state): string => match ($state) {
+                        'P' => 'PROFORMA',
+                        'F' => 'FACTURA',
+                        default => 'Desconocido',
+                    })
+                    ->color(fn(string $state): string => match ($state) {
+                        'P' => 'warning',
+                        'F' => 'success',
+                        default => 'gray',
+                    })
+                    ->toggleable(isToggledHiddenByDefault: true)
+                    ->sortable(),
                 Tables\Columns\TextColumn::make('numero_factura_proforma')
                     ->label('N° Fact/Proforma')
                     ->searchable()
@@ -1262,21 +1282,7 @@ class OrdenCompraResource extends Resource
                     ->searchable()
                     ->sortable(),
 
-                Tables\Columns\TextColumn::make('formato')
-                    ->label('Formato')
-                    ->badge()
-                    ->formatStateUsing(fn(string $state): string => match ($state) {
-                        'P' => 'PROFORMA',
-                        'F' => 'FACTURA',
-                        default => 'Desconocido',
-                    })
-                    ->color(fn(string $state): string => match ($state) {
-                        'P' => 'warning',
-                        'F' => 'success',
-                        default => 'gray',
-                    })
-                    ->toggleable(isToggledHiddenByDefault: true)
-                    ->sortable(),
+
 
                 Tables\Columns\TextColumn::make('tipo_oc')
                     ->label('Tipo Orden Compra')
@@ -1336,7 +1342,16 @@ class OrdenCompraResource extends Resource
                     ->boolean(),
             ])
             ->filters([
-                // Aquí puedes añadir filtros si es necesario
+                //ademas selecionada por defecto
+
+                Filter::make('mis_ordenes')
+                    ->label('Mis órdenes')
+                    ->query(
+                        fn(Builder $query): Builder =>
+                        $query->whereBelongsTo(auth()->user(), 'usuario')
+                    )
+                    ->default(),
+
             ])
             ->actions([
 
@@ -1384,7 +1399,7 @@ class OrdenCompraResource extends Resource
                     ->requiresConfirmation()
                     ->visible(fn(OrdenCompra $record) => self::userIsAdmin())
                     ->authorize(fn() => self::userIsAdmin())
-                    ->disabled(fn(OrdenCompra $record) => $record->anulada),
+                //->disabled(fn(OrdenCompra $record) => $record->anulada),
 
             ])
             ->bulkActions([

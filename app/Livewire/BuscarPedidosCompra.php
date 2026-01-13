@@ -14,6 +14,7 @@ use Filament\Tables;
 use Illuminate\Database\Eloquent\Builder;
 use App\Filament\Resources\OrdenCompraResource;
 use App\Models\PedidoCompra;
+use App\Models\DetalleOrdenCompra;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Collection;
@@ -119,31 +120,7 @@ class BuscarPedidosCompra extends Component implements HasForms, HasTable
                 // $join->on('saedped.dped_cod_sucu', '=', 'saepedi.pedi_cod_sucu');
             })
             ->where('saepedi.pedi_cod_empr', $this->amdg_id_empresa)
-            ->where('saepedi.pedi_cod_sucu', $this->amdg_id_sucursal)
-            ->where(function ($q) {
-                // ✅ 1) Pedidos con items pendientes
-                $q->where(function ($qq) {
-                    $qq->whereNotNull('saedped.dped_cod_pedi')
-                        ->whereColumn('saedped.dped_can_ped', '>', 'saedped.dped_can_ent');
-                });
-
-                // ✅ 2) O pedidos ANULADOS (ajusta el campo/valor según tu base)
-                $q->orWhere(function ($qq) {
-                    // EJEMPLOS (usa el que aplique en tu SAE):
-                    // $qq->where('saepedi.pedi_est_pedi', 'ANU');
-                    // $qq->where('saepedi.pedi_est_pedi', 'A');
-                    // $qq->where('saepedi.pedi_anu_pedi', 'S');
-                    // $qq->where('saepedi.pedi_anulado', 1);
-
-                    $qq->where('saepedi.pedi_est_pedi', 'ANU'); // <-- CAMBIA AQUÍ si tu campo/valor es otro
-                });
-            });
-
-
-        $pedidosImportados = $this->resolvePedidosImportados();
-        if (!empty($pedidosImportados)) {
-            $query->whereNotIn('saepedi.pedi_cod_pedi', $pedidosImportados);
-        }
+            ->where('saepedi.pedi_cod_sucu', $this->amdg_id_sucursal);
 
         if (!empty($formData['fecha_desde']) && !empty($formData['fecha_hasta'])) {
             $query->whereBetween('saepedi.pedi_fec_pedi', [
@@ -151,6 +128,19 @@ class BuscarPedidosCompra extends Component implements HasForms, HasTable
                 $formData['fecha_hasta']
             ]);
         }
+
+        $pedidosDisponibles = $this->resolvePedidosDisponibles($connectionName, $formData);
+        if (empty($pedidosDisponibles)) {
+            return PedidoCompra::query()->whereRaw('1 = 0');
+        }
+
+        $query->whereIn('saepedi.pedi_cod_pedi', $pedidosDisponibles);
+
+        $pedidosImportados = $this->resolvePedidosImportados();
+        if (!empty($pedidosImportados)) {
+            $query->whereNotIn('saepedi.pedi_cod_pedi', $pedidosImportados);
+        }
+
         return $query;
     }
 
@@ -159,6 +149,89 @@ class BuscarPedidosCompra extends Component implements HasForms, HasTable
         $fromForm = $this->parsePedidosImportados($this->pedidos_importados);
 
         return array_values(array_unique(array_filter($fromForm)));
+    }
+
+    private function resolvePedidosDisponibles(string $connectionName, array $formData): array
+    {
+        $pedidoQuery = DB::connection($connectionName)
+            ->table('saepedi')
+            ->select('pedi_cod_pedi', 'pedi_est_pedi')
+            ->where('pedi_cod_empr', $this->amdg_id_empresa)
+            ->where('pedi_cod_sucu', $this->amdg_id_sucursal);
+
+        if (!empty($formData['fecha_desde']) && !empty($formData['fecha_hasta'])) {
+            $pedidoQuery->whereBetween('pedi_fec_pedi', [
+                $formData['fecha_desde'],
+                $formData['fecha_hasta']
+            ]);
+        }
+
+        $pedidos = $pedidoQuery->get();
+        if ($pedidos->isEmpty()) {
+            return [];
+        }
+
+        $pedidoIds = $pedidos->pluck('pedi_cod_pedi')->map(fn($pedido) => (int) $pedido)->all();
+        $pedidoAnulados = $pedidos
+            ->filter(fn($pedido) => $pedido->pedi_est_pedi === 'ANU')
+            ->pluck('pedi_cod_pedi')
+            ->map(fn($pedido) => (int) $pedido)
+            ->all();
+
+        $pedidosPendientes = $this->resolvePedidosConPendientes($connectionName, $pedidoIds);
+
+        return array_values(array_unique(array_merge($pedidosPendientes, $pedidoAnulados)));
+    }
+
+    private function resolvePedidosConPendientes(string $connectionName, array $pedidoIds): array
+    {
+        if (empty($pedidoIds)) {
+            return [];
+        }
+
+        $detalles = DB::connection($connectionName)
+            ->table('saedped')
+            ->select('dped_cod_pedi', 'dped_cod_dped', 'dped_can_ped')
+            ->where('dped_cod_empr', $this->amdg_id_empresa)
+            ->where('dped_cod_sucu', $this->amdg_id_sucursal)
+            ->whereIn('dped_cod_pedi', $pedidoIds)
+            ->get();
+
+        if ($detalles->isEmpty()) {
+            return [];
+        }
+
+        $detalleIds = $detalles->pluck('dped_cod_dped')->filter()->unique()->values()->all();
+        $importadoPorDetalle = $this->resolveImportadoPorDetalle($detalleIds);
+
+        $pendientes = [];
+        foreach ($detalles as $detalle) {
+            $cantidadPedida = (float) ($detalle->dped_can_ped ?? 0);
+            $cantidadImportada = (float) ($importadoPorDetalle[$detalle->dped_cod_dped] ?? 0);
+            $cantidadPendiente = $cantidadPedida - $cantidadImportada;
+
+            if ($cantidadPendiente > 0) {
+                $pendientes[(int) $detalle->dped_cod_pedi] = true;
+            }
+        }
+
+        return array_keys($pendientes);
+    }
+
+    private function resolveImportadoPorDetalle(array $detalleIds): array
+    {
+        if (empty($detalleIds)) {
+            return [];
+        }
+
+        return DetalleOrdenCompra::query()
+            ->select('pedido_detalle_id', DB::raw('SUM(cantidad) as cantidad_importada'))
+            ->whereIn('pedido_detalle_id', $detalleIds)
+            ->whereHas('ordenCompra', fn($query) => $query->where('anulada', false))
+            ->groupBy('pedido_detalle_id')
+            ->pluck('cantidad_importada', 'pedido_detalle_id')
+            ->map(fn($cantidad) => (float) $cantidad)
+            ->all();
     }
 
     private function parsePedidosImportados(?string $value): array
@@ -206,8 +279,23 @@ class BuscarPedidosCompra extends Component implements HasForms, HasTable
                                 ->table('saedped')
                                 ->where('dped_cod_pedi', $record->pedi_cod_pedi)
                                 ->where('dped_cod_empr', $this->amdg_id_empresa)
-                                ->whereColumn('dped_can_ped', '>', 'dped_can_ent')
+                                ->where('dped_cod_sucu', $this->amdg_id_sucursal)
                                 ->get();
+
+                            $detalleIds = $details->pluck('dped_cod_dped')->filter()->unique()->values()->all();
+                            $importadoPorDetalle = $this->resolveImportadoPorDetalle($detalleIds);
+
+                            $details = $details->map(function ($detail) use ($importadoPorDetalle) {
+                                $cantidadPedida = (float) ($detail->dped_can_ped ?? 0);
+                                $cantidadImportada = (float) ($importadoPorDetalle[$detail->dped_cod_dped] ?? 0);
+                                $cantidadPendiente = $cantidadPedida - $cantidadImportada;
+
+                                $detail->cantidad_importada = $cantidadImportada;
+                                $detail->cantidad_pendiente = $cantidadPendiente;
+
+                                return $detail;
+                            })->filter(fn($detail) => $detail->cantidad_pendiente > 0);
+
                             return view('livewire.pedido-compra-detail-view', ['details' => $details]);
                         } catch (\Exception $e) {
                             return view('livewire.pedido-compra-detail-view', ['details' => collect(), 'error' => 'Error al consultar detalles: ' . $e->getMessage()]);

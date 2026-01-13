@@ -4,6 +4,7 @@ namespace App\Filament\Resources\OrdenCompraResource\Pages;
 
 use App\Filament\Resources\OrdenCompraResource;
 use App\Services\OrdenCompraSyncService;
+use App\Models\DetalleOrdenCompra;
 use Filament\Resources\Pages\CreateRecord;
 use Filament\Actions\Action;
 use Illuminate\Database\Eloquent\Model;
@@ -107,76 +108,32 @@ class CreateOrdenCompra extends CreateRecord
         $detalles = DB::connection($connectionName)
             ->table('saedped')
             ->whereIn('dped_cod_pedi', $pedidos)
-            ->whereColumn('dped_can_ped', '>', 'dped_can_ent')
+            ->where('dped_cod_empr', $this->data['amdg_id_empresa'])
+            ->where('dped_cod_sucu', $this->data['amdg_id_sucursal'])
             ->get();
 
-        // Group by product/warehouse, keeping services separate and auxiliars grouped by standard code when available.
-        $detallesAgrupados = $detalles->values()->groupBy(function ($item, $key) {
-            $codigoProducto = $item->dped_cod_prod ?? null;
-            $codigoBodega = $item->dped_cod_bode ?? 'bode';
-            $esServicio = $this->isServicioItem($codigoProducto);
-            $esAuxiliar = $this->isAuxiliarItem($item);
+        $detalleIds = $detalles->pluck('dped_cod_dped')->filter()->unique()->values()->all();
+        $importadoPorDetalle = $this->resolveImportadoPorDetalle($detalleIds);
 
-            if ($esServicio) {
-                return 'servicio-' . ($item->dped_cod_pedi ?? 'pedido') . '-' . $codigoBodega . '-' . uniqid('', true);
-            }
+        $detallesPendientes = $detalles->map(function ($detalle) use ($importadoPorDetalle) {
+            $cantidadPedida = (float) ($detalle->dped_can_ped ?? 0);
+            $cantidadImportada = (float) ($importadoPorDetalle[$detalle->dped_cod_dped] ?? 0);
+            $cantidadPendiente = $cantidadPedida - $cantidadImportada;
 
-            if ($esAuxiliar) {
-                $auxKey = $item->dped_cod_auxiliar
-                    ?? $item->dped_desc_auxiliar
-                    ?? $item->dped_desc_axiliar
-                    ?? $item->dped_det_dped
-                    ?? 'aux';
-                return 'aux-' . ($item->dped_cod_pedi ?? 'pedido') . '-' . $codigoBodega . '-' . $auxKey . '-' . $key;
-            }
+            $detalle->cantidad_pendiente = $cantidadPendiente;
 
-            if (!empty($codigoProducto)) {
-                return $codigoProducto . '-' . $codigoBodega;
-            }
+            return $detalle;
+        })->filter(fn($detalle) => $detalle->cantidad_pendiente > 0);
 
-            return 'aux-' . ($item->dped_det_dped ?? uniqid('', true));
-        })->map(function ($group) {
-            $first = $group->first();
-            $cantidadPedida = $group->sum(fn($i) => (float) $i->dped_can_ped);
-            $cantidadEntregada = $group->sum(fn($i) => (float) $i->dped_can_ent);
-            $cantidadPendiente = $cantidadPedida - $cantidadEntregada;
-            $esAuxiliar = $this->isAuxiliarItem($first);
-            $esServicio = $this->isServicioItem($first->dped_cod_prod ?? null);
-            $codigoProducto = $first->dped_cod_prod ?? null;
-
-            return (object) [
-                'dped_cod_prod' => $first->dped_cod_prod,
-                'cantidad_pendiente' => $cantidadPendiente,
-                'dped_cod_bode' => $first->dped_cod_bode,
-                'es_auxiliar' => $esAuxiliar,
-                'es_servicio' => $esServicio,
-                'auxiliar_codigo' => $first->dped_cod_auxiliar ?? null,
-                'auxiliar_descripcion' => $first->dped_desc_auxiliar
-                    ?? $first->dped_desc_axiliar
-                    ?? null,
-                'auxiliar_nombre' => $first->dped_det_dped
-                    ?? $first->dped_desc_auxiliar
-                    ?? $first->dped_desc_axiliar
-                    ?? $first->deped_prod_nom
-                    ?? null,
-                'servicio_nombre' => $first->dped_det_dped
-                    ?? $first->dped_desc_auxiliar
-                    ?? $first->dped_desc_axiliar
-                    ?? $first->deped_prod_nom
-                    ?? null,
-                'codigo_producto_estandar' => $codigoProducto,
-            ];
-        })->where('cantidad_pendiente', '>', 0); // Filter out fully delivered items
-
-        if ($detallesAgrupados->isNotEmpty()) {
-            $repeaterItems = $detallesAgrupados->map(function ($detalle) use ($connectionName) {
+        if ($detallesPendientes->isNotEmpty()) {
+            $repeaterItems = $detallesPendientes->map(function ($detalle) use ($connectionName) {
                 // Use the specific warehouse code for this group
                 $id_bodega_item = $detalle->dped_cod_bode;
 
                 $costo = 0;
                 $impuesto = 0;
                 $productoNombre = 'Producto no encontrado';
-                $codigoProducto = $detalle->codigo_producto_estandar ?? $detalle->dped_cod_prod;
+                $codigoProducto = $detalle->dped_cod_prod ?? null;
 
                 if (!empty($codigoProducto)) {
                     $productData = DB::connection($connectionName)
@@ -202,42 +159,49 @@ class CreateOrdenCompra extends CreateRecord
                 $auxiliarDescripcion = null;
                 $auxiliarData = null;
 
-                if ($detalle->es_auxiliar) {
+                $esAuxiliar = $this->isAuxiliarItem($detalle);
+                if ($esAuxiliar) {
+                    $descripcionAuxiliar = $detalle->dped_desc_auxiliar ?? $detalle->dped_desc_axiliar;
                     $auxiliarDescripcion = trim(collect([
-                        $detalle->auxiliar_codigo ? 'Código auxiliar: ' . $detalle->auxiliar_codigo : null,
-                        $detalle->auxiliar_nombre ? 'Descripción: ' . $detalle->auxiliar_nombre : null,
-                        $detalle->auxiliar_descripcion ? 'Descripción auxiliar: ' . $detalle->auxiliar_descripcion : null,
+                        $detalle->dped_cod_auxiliar ? 'Código auxiliar: ' . $detalle->dped_cod_auxiliar : null,
+                        $detalle->dped_det_dped ? 'Descripción: ' . $detalle->dped_det_dped : null,
+                        $descripcionAuxiliar ? 'Descripción auxiliar: ' . $descripcionAuxiliar : null,
                     ])->filter()->implode(' | '));
 
                     $auxiliarData = [
-                        'codigo' => $detalle->auxiliar_codigo,
-                        'descripcion' => $detalle->auxiliar_nombre,
-                        'descripcion_auxiliar' => $detalle->auxiliar_descripcion,
+                        'codigo' => $detalle->dped_cod_auxiliar,
+                        'descripcion' => $detalle->dped_det_dped,
+                        'descripcion_auxiliar' => $descripcionAuxiliar,
                     ];
                 }
 
                 $servicioDescripcion = null;
 
-                if ($detalle->es_servicio) {
+                $esServicio = $this->isServicioItem($codigoProducto);
+                if ($esServicio) {
                     $servicioDescripcion = trim(collect([
                         $detalle->dped_cod_prod ? 'Código servicio: ' . $detalle->dped_cod_prod : null,
-                        $detalle->servicio_nombre ? 'Descripción: ' . $detalle->servicio_nombre : null,
+                        $detalle->dped_det_dped
+                            ? 'Descripción: ' . $detalle->dped_det_dped
+                            : null,
                     ])->filter()->implode(' | '));
                 }
 
-                $productoLinea = $detalle->es_servicio
-                    ? ($detalle->servicio_nombre ?? $productoNombre)
+                $productoLinea = $esServicio
+                    ? ($detalle->dped_det_dped ?? $productoNombre)
                     : $productoNombre;
 
                 return [
                     'id_bodega' => $id_bodega_item, // Set the correct warehouse for this line
                     'codigo_producto' => $codigoProducto,
                     'producto' => $productoLinea,
-                    'es_auxiliar' => $detalle->es_auxiliar,
-                    'es_servicio' => $detalle->es_servicio,
+                    'es_auxiliar' => $esAuxiliar,
+                    'es_servicio' => $esServicio,
                     'producto_auxiliar' => $auxiliarDescripcion,
                     'producto_servicio' => $servicioDescripcion,
                     'detalle' => $auxiliarData ? json_encode($auxiliarData, JSON_UNESCAPED_UNICODE) : null,
+                    'pedido_codigo' => $detalle->dped_cod_pedi,
+                    'pedido_detalle_id' => $detalle->dped_cod_dped,
 
                     'cantidad' => $detalle->cantidad_pendiente,
                     'costo' => $costo,
@@ -309,6 +273,22 @@ class CreateOrdenCompra extends CreateRecord
             ->map(fn($pedido) => (int) ltrim((string) $pedido, '0'))
             ->filter(fn($pedido) => $pedido > 0)
             ->values()
+            ->all();
+    }
+
+    private function resolveImportadoPorDetalle(array $detalleIds): array
+    {
+        if (empty($detalleIds)) {
+            return [];
+        }
+
+        return DetalleOrdenCompra::query()
+            ->select('pedido_detalle_id', DB::raw('SUM(cantidad) as cantidad_importada'))
+            ->whereIn('pedido_detalle_id', $detalleIds)
+            ->whereHas('ordenCompra', fn($query) => $query->where('anulada', false))
+            ->groupBy('pedido_detalle_id')
+            ->pluck('cantidad_importada', 'pedido_detalle_id')
+            ->map(fn($cantidad) => (float) $cantidad)
             ->all();
     }
 

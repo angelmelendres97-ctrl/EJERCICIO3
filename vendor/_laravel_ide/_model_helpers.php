@@ -973,6 +973,7 @@ namespace App\Models {
     /**
      * App\Models\ResumenPedidos
      *
+     * @property boolean $anulada
      * @property int|null $id_usuario
      * @property \Illuminate\Support\Carbon|null $updated_at
      * @property \Illuminate\Support\Carbon|null $created_at
@@ -997,6 +998,7 @@ namespace App\Models {
      * @method static \Illuminate\Database\Eloquent\Builder<ResumenPedidos>|ResumenPedidos whereCreatedAt($value)
      * @method static \Illuminate\Database\Eloquent\Builder<ResumenPedidos>|ResumenPedidos whereUpdatedAt($value)
      * @method static \Illuminate\Database\Eloquent\Builder<ResumenPedidos>|ResumenPedidos whereIdUsuario($value)
+     * @method static \Illuminate\Database\Eloquent\Builder<ResumenPedidos>|ResumenPedidos whereAnulada($value)
      * @method static \Illuminate\Database\Eloquent\Builder<ResumenPedidos>|ResumenPedidos newModelQuery()
      * @method static \Illuminate\Database\Eloquent\Builder<ResumenPedidos>|ResumenPedidos newQuery()
      * @method static \Illuminate\Database\Eloquent\Builder<ResumenPedidos>|ResumenPedidos query()

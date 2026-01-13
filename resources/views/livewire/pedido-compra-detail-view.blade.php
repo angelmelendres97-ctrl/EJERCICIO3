@@ -9,7 +9,7 @@
     @else
         @php
             $totalGeneral = $details->sum(function($detail) {
-                return $detail->dped_can_ped * $detail->dped_prc_dped;
+                return $detail->cantidad_pendiente * $detail->dped_prc_dped;
             });
         @endphp
         <table class="w-full text-sm text-left text-gray-500 dark:text-gray-400">
@@ -19,8 +19,8 @@
                     <th scope="col" class="px-6 py-3 text-right">Cantidad</th>
                     <th scope="col" class="px-6 py-3 text-right">Costo</th>
                     <th scope="col" class="px-6 py-3 text-right">Total</th>
-                    <th scope="col" class="px-6 py-3 text-right">Cantidad Recibida</th>
-                    <th scope="col" class="px-6 py-3 text-right">Por recibir</th>
+                    <th scope="col" class="px-6 py-3 text-right">Cantidad Importada</th>
+                    <th scope="col" class="px-6 py-3 text-right">Pendiente</th>
                 </tr>
             </thead>
             <tbody>
@@ -29,9 +29,9 @@
                         <td class="px-6 py-4">{{ $detail->dped_prod_nom }} ({{$detail->dped_cod_prod}})</td>
                         <td class="px-6 py-4 text-right">{{ number_format($detail->dped_can_ped, 2) }}</td>
                         <td class="px-6 py-4 text-right">${{ number_format($detail->dped_prc_dped, 2) }}</td>
-                        <td class="px-6 py-4 text-right">${{ number_format($detail->dped_can_ped * $detail->dped_prc_dped, 2) }}</td>
-                        <td class="px-6 py-4 text-right">{{ number_format($detail->dped_can_ent, 2) }}</td>
-                        <td class="px-6 py-4 text-right">{{ number_format($detail->dped_can_ped - $detail->dped_can_ent, 2) }}</td>
+                        <td class="px-6 py-4 text-right">${{ number_format($detail->cantidad_pendiente * $detail->dped_prc_dped, 2) }}</td>
+                        <td class="px-6 py-4 text-right">{{ number_format($detail->cantidad_importada, 2) }}</td>
+                        <td class="px-6 py-4 text-right">{{ number_format($detail->cantidad_pendiente, 2) }}</td>
                     </tr>
                 @endforeach
             </tbody>
