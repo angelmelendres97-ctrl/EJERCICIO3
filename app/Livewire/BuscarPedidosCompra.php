@@ -142,7 +142,14 @@ class BuscarPedidosCompra extends Component implements HasForms, HasTable
 
         $pedidosImportados = $this->resolvePedidosImportados();
         if (!empty($pedidosImportados)) {
-            $query->whereNotIn('saepedi.pedi_cod_pedi', $pedidosImportados);
+            $pedidosParaExcluir = $this->resolvePedidosImportadosParaExcluir(
+                $connectionName,
+                $pedidosImportados
+            );
+
+            if (!empty($pedidosParaExcluir)) {
+                $query->whereNotIn('saepedi.pedi_cod_pedi', $pedidosParaExcluir);
+            }
         }
 
         if (!empty($formData['fecha_desde']) && !empty($formData['fecha_hasta'])) {
@@ -159,6 +166,20 @@ class BuscarPedidosCompra extends Component implements HasForms, HasTable
         $fromForm = $this->parsePedidosImportados($this->pedidos_importados);
 
         return array_values(array_unique(array_filter($fromForm)));
+    }
+
+    private function resolvePedidosImportadosParaExcluir(string $connectionName, array $pedidosImportados): array
+    {
+        $pedidosConPendientes = DB::connection($connectionName)
+            ->table('saedped')
+            ->whereIn('dped_cod_pedi', $pedidosImportados)
+            ->whereColumn('dped_can_ped', '>', 'dped_can_ent')
+            ->distinct()
+            ->pluck('dped_cod_pedi')
+            ->map(fn($pedido) => (int) $pedido)
+            ->all();
+
+        return array_values(array_diff($pedidosImportados, $pedidosConPendientes));
     }
 
     private function parsePedidosImportados(?string $value): array
