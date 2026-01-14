@@ -4,11 +4,14 @@ namespace App\Filament\Resources;
 
 use App\Filament\Resources\EgresoSolicitudPagoResource\Pages;
 use App\Models\SolicitudPago;
+use App\Services\SolicitudPagoReportService;
+use Barryvdh\DomPDF\Facade\Pdf;
 use Filament\Resources\Resource;
 use Filament\Tables;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Support\Facades\Auth;
 
 class EgresoSolicitudPagoResource extends Resource
 {
@@ -68,6 +71,62 @@ class EgresoSolicitudPagoResource extends Resource
                     ->color('primary')
                     ->url(fn(SolicitudPago $record) => self::getUrl('registrar', ['record' => $record]))
                     ->openUrlInNewTab(),
+                Tables\Actions\ActionGroup::make([
+                    Tables\Actions\Action::make('solicitudPdf')
+                        ->label('Solicitud PDF')
+                        ->icon('heroicon-o-document-arrow-down')
+                        ->color('primary')
+                        ->action(function (SolicitudPago $record) {
+                            $record->loadMissing('detalles');
+                            $data = SolicitudPagoReportService::buildReportData($record);
+                            $descripcion = $record->motivo ?? 'Solicitud de pago de facturas';
+
+                            return response()->streamDownload(function () use ($data, $descripcion) {
+                                echo Pdf::loadView('pdfs.solicitud-pago-facturas-general', [
+                                    'empresas' => $data['empresas'],
+                                    'resumenEmpresas' => $data['resumen'],
+                                    'usuario' => Auth::user()?->name,
+                                    'totales' => $data['totales'],
+                                    'descripcionReporte' => $descripcion,
+                                    'compras' => $data['comprasReport'],
+                                ])->setPaper('a4', 'landscape')->stream();
+                            }, 'solicitud-pago-facturas.pdf');
+                        }),
+                    Tables\Actions\Action::make('solicitudExcel')
+                        ->label('Solicitud EXCEL')
+                        ->icon('heroicon-o-table-cells')
+                        ->color('success')
+                        ->action(function (SolicitudPago $record) {
+                            $record->loadMissing('detalles');
+                            $data = SolicitudPagoReportService::buildReportData($record);
+                            $rows = SolicitudPagoReportService::buildGeneralExcelRows($data['empresas']);
+
+                            return response()->streamDownload(function () use ($rows) {
+                                $handle = fopen('php://output', 'wb');
+
+                                fputcsv($handle, array_keys($rows[0] ?? [
+                                    'Conexion' => 'Conexion',
+                                    'Empresa' => 'Empresa',
+                                    'Proveedor' => 'Proveedor',
+                                    'RUC' => 'RUC',
+                                    'Descripcion' => 'Descripcion',
+                                    'Valor' => 'Valor',
+                                    'Abono' => 'Abono',
+                                    'Saldo pendiente' => 'Saldo pendiente',
+                                ]));
+
+                                foreach ($rows as $row) {
+                                    fputcsv($handle, $row);
+                                }
+
+                                fclose($handle);
+                            }, 'solicitud-pago-facturas.csv');
+                        }),
+                ])
+                    ->label('Descargar')
+                    ->icon('heroicon-o-arrow-down-tray')
+                    ->color('gray')
+                    ->button(),
             ])
             ->bulkActions([]);
     }

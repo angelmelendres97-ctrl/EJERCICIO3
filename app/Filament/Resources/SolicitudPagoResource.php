@@ -8,6 +8,8 @@ use App\Models\Empresa;
 use App\Models\SolicitudPago;
 use App\Models\SolicitudPagoDetalle;
 use App\Models\SolicitudPagoAdjunto;
+use App\Services\SolicitudPagoReportService;
+use Barryvdh\DomPDF\Facade\Pdf;
 use Filament\Forms\Components\DatePicker;
 use Filament\Forms\Components\FileUpload;
 use Filament\Forms\Components\Hidden;
@@ -36,6 +38,7 @@ use Illuminate\Support\Carbon;
 use Illuminate\Validation\ValidationException;
 use Filament\Resources\Pages\Page;
 use Filament\Resources\Pages\ViewRecord;
+use Illuminate\Support\Facades\Auth;
 
 class SolicitudPagoResource extends Resource
 {
@@ -1158,6 +1161,60 @@ class SolicitudPagoResource extends Resource
                         })
                         ->modalSubmitAction(false)
                         ->modalCancelAction(fn(StaticAction $action) => $action->label('Cerrar')),
+
+                    Tables\Actions\Action::make('solicitudPdf')
+                        ->label('Solicitud PDF')
+                        ->icon('heroicon-o-document-arrow-down')
+                        ->color('primary')
+                        ->visible(fn(SolicitudPago $record) => strtoupper($record->estado ?? '') === 'APROBADA')
+                        ->action(function (SolicitudPago $record) {
+                            $record->loadMissing('detalles');
+                            $data = SolicitudPagoReportService::buildReportData($record);
+                            $descripcion = $record->motivo ?? 'Solicitud de pago de facturas';
+
+                            return response()->streamDownload(function () use ($data, $descripcion) {
+                                echo Pdf::loadView('pdfs.solicitud-pago-facturas-general', [
+                                    'empresas' => $data['empresas'],
+                                    'resumenEmpresas' => $data['resumen'],
+                                    'usuario' => Auth::user()?->name,
+                                    'totales' => $data['totales'],
+                                    'descripcionReporte' => $descripcion,
+                                    'compras' => $data['comprasReport'],
+                                ])->setPaper('a4', 'landscape')->stream();
+                            }, 'solicitud-pago-facturas.pdf');
+                        }),
+
+                    Tables\Actions\Action::make('solicitudExcel')
+                        ->label('Solicitud EXCEL')
+                        ->icon('heroicon-o-table-cells')
+                        ->color('success')
+                        ->visible(fn(SolicitudPago $record) => strtoupper($record->estado ?? '') === 'APROBADA')
+                        ->action(function (SolicitudPago $record) {
+                            $record->loadMissing('detalles');
+                            $data = SolicitudPagoReportService::buildReportData($record);
+                            $rows = SolicitudPagoReportService::buildGeneralExcelRows($data['empresas']);
+
+                            return response()->streamDownload(function () use ($rows) {
+                                $handle = fopen('php://output', 'wb');
+
+                                fputcsv($handle, array_keys($rows[0] ?? [
+                                    'Conexion' => 'Conexion',
+                                    'Empresa' => 'Empresa',
+                                    'Proveedor' => 'Proveedor',
+                                    'RUC' => 'RUC',
+                                    'Descripcion' => 'Descripcion',
+                                    'Valor' => 'Valor',
+                                    'Abono' => 'Abono',
+                                    'Saldo pendiente' => 'Saldo pendiente',
+                                ]));
+
+                                foreach ($rows as $row) {
+                                    fputcsv($handle, $row);
+                                }
+
+                                fclose($handle);
+                            }, 'solicitud-pago-facturas.csv');
+                        }),
 
                     Tables\Actions\Action::make('adjuntos')
                         ->label('Adjuntos')
