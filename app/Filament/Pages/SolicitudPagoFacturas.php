@@ -635,7 +635,7 @@ class SolicitudPagoFacturas extends Page implements HasForms
                     ->color('success')
                     ->action(fn() => $this->exportDetailedExcel()),
             ])
-                ->label('Reporte')
+                ->label('Reporte PDF')
                 ->button()                // 🔥 ESTO ES LA CLAVE
                 ->iconPosition('before')
                 ->color('danger')

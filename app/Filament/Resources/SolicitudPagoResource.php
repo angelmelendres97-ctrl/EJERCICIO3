@@ -1052,6 +1052,9 @@ class SolicitudPagoResource extends Resource
     public static function table(Table $table): Table
     {
         return $table
+            //poner al inicio las acciones
+            ->actionsPosition(\Filament\Tables\Enums\ActionsPosition::BeforeColumns)
+
             ->defaultSort('created_at', 'desc')
             ->recordUrl(null)
             ->recordAction('verFacturas')
@@ -1323,7 +1326,7 @@ class SolicitudPagoResource extends Resource
                         ->modalCancelAction(fn(StaticAction $action) => $action->label('Cerrar')),
 
                     Tables\Actions\Action::make('gestionar')
-                        ->label('Gestionar')
+                        ->label('Asignar abonos facturas')
                         ->icon('heroicon-o-pencil-square')
                         ->color('primary')
                         ->visible(fn(SolicitudPago $record) => strtoupper($record->estado ?? '') === 'BORRADOR')
