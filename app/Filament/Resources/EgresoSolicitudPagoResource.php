@@ -4,6 +4,7 @@ namespace App\Filament\Resources;
 
 use App\Filament\Resources\EgresoSolicitudPagoResource\Pages;
 use App\Models\SolicitudPago;
+use App\Services\SolicitudPagoReportService;
 use Filament\Resources\Resource;
 use Filament\Tables;
 use Filament\Tables\Columns\TextColumn;
@@ -68,6 +69,22 @@ class EgresoSolicitudPagoResource extends Resource
                     ->color('primary')
                     ->url(fn(SolicitudPago $record) => self::getUrl('registrar', ['record' => $record]))
                     ->openUrlInNewTab(),
+                Tables\Actions\ActionGroup::make([
+                    Tables\Actions\Action::make('descargarPdf')
+                        ->label('Solicitud PDF')
+                        ->icon('heroicon-o-document-arrow-down')
+                        ->color('danger')
+                        ->action(fn(SolicitudPago $record) => app(SolicitudPagoReportService::class)->exportPdf($record)),
+                    Tables\Actions\Action::make('descargarExcel')
+                        ->label('Solicitud EXCEL')
+                        ->icon('heroicon-o-table-cells')
+                        ->color('success')
+                        ->action(fn(SolicitudPago $record) => app(SolicitudPagoReportService::class)->exportExcel($record)),
+                ])
+                    ->label('Descargar solicitud')
+                    ->icon('heroicon-o-arrow-down-tray')
+                    ->color('gray')
+                    ->button(),
             ])
             ->bulkActions([]);
     }
