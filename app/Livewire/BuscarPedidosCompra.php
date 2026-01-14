@@ -201,13 +201,17 @@ class BuscarPedidosCompra extends Component implements HasForms, HasTable
             return [];
         }
 
-        $detalleIds = $detalles->pluck('dped_cod_dped')->filter()->unique()->values()->all();
-        $importadoPorDetalle = $this->resolveImportadoPorDetalle($detalleIds);
+        $pedidoDetallePairs = $detalles->map(fn($detalle) => [
+            'pedido_codigo' => (int) $detalle->dped_cod_pedi,
+            'pedido_detalle_id' => (int) $detalle->dped_cod_dped,
+        ])->values()->all();
+        $importadoPorDetalle = $this->resolveImportadoPorDetalle($pedidoDetallePairs);
 
         $pendientes = [];
         foreach ($detalles as $detalle) {
             $cantidadPedida = (float) ($detalle->dped_can_ped ?? 0);
-            $cantidadImportada = (float) ($importadoPorDetalle[$detalle->dped_cod_dped] ?? 0);
+            $key = ((int) $detalle->dped_cod_pedi) . ':' . ((int) $detalle->dped_cod_dped);
+            $cantidadImportada = (float) ($importadoPorDetalle[$key] ?? 0);
             $cantidadPendiente = $cantidadPedida - $cantidadImportada;
 
             if ($cantidadPendiente > 0) {
@@ -218,37 +222,37 @@ class BuscarPedidosCompra extends Component implements HasForms, HasTable
         return array_keys($pendientes);
     }
 
-private function resolveImportadoPorDetalle(array $pedidoDetallePairs): array
-{
-    if (empty($pedidoDetallePairs)) {
-        return [];
+    private function resolveImportadoPorDetalle(array $pedidoDetallePairs): array
+    {
+        if (empty($pedidoDetallePairs)) {
+            return [];
+        }
+
+        $pedidoCodigos = collect($pedidoDetallePairs)->pluck('pedido_codigo')->filter()->unique()->values()->all();
+        $detalleIds    = collect($pedidoDetallePairs)->pluck('pedido_detalle_id')->filter()->unique()->values()->all();
+
+        if (empty($pedidoCodigos) || empty($detalleIds)) {
+            return [];
+        }
+
+        $rows = DetalleOrdenCompra::query()
+            ->select([
+                'pedido_codigo',
+                'pedido_detalle_id',
+                DB::raw('SUM(cantidad) as cantidad_importada'),
+            ])
+            ->whereIn('pedido_codigo', $pedidoCodigos)
+            ->whereIn('pedido_detalle_id', $detalleIds)
+            ->whereHas('ordenCompra', fn($q) => $q->where('anulada', false))
+            ->groupBy('pedido_codigo', 'pedido_detalle_id')
+            ->get();
+
+        return $rows->mapWithKeys(function ($row) {
+            $key = ((int) $row->pedido_codigo) . ':' . ((int) $row->pedido_detalle_id);
+
+            return [$key => (float) $row->cantidad_importada];
+        })->all();
     }
-
-    $pedidoCodigos = collect($pedidoDetallePairs)->pluck('pedido_codigo')->filter()->unique()->values()->all();
-    $detalleIds    = collect($pedidoDetallePairs)->pluck('pedido_detalle_id')->filter()->unique()->values()->all();
-
-    if (empty($pedidoCodigos) || empty($detalleIds)) {
-        return [];
-    }
-
-    $rows = DetalleOrdenCompra::query()
-        ->select([
-            'pedido_codigo',
-            'pedido_detalle_id',
-            DB::raw('SUM(cantidad) as cantidad_importada'),
-        ])
-        ->whereIn('pedido_codigo', $pedidoCodigos)
-        ->whereIn('pedido_detalle_id', $detalleIds)
-        ->whereHas('ordenCompra', fn($q) => $q->where('anulada', false))
-        ->groupBy('pedido_codigo', 'pedido_detalle_id')
-        ->get();
-
-    return $rows->mapWithKeys(function ($row) {
-        $key = ((int) $row->pedido_codigo) . ':' . ((int) $row->pedido_detalle_id);
-
-        return [$key => (float) $row->cantidad_importada];
-    })->all();
-}
 
 
     private function parsePedidosImportados(?string $value): array
@@ -299,12 +303,16 @@ private function resolveImportadoPorDetalle(array $pedidoDetallePairs): array
                                 ->where('dped_cod_sucu', $this->amdg_id_sucursal)
                                 ->get();
 
-                            $detalleIds = $details->pluck('dped_cod_dped')->filter()->unique()->values()->all();
-                            $importadoPorDetalle = $this->resolveImportadoPorDetalle($detalleIds);
+                            $pedidoDetallePairs = $details->map(fn($detail) => [
+                                'pedido_codigo' => (int) $detail->dped_cod_pedi,
+                                'pedido_detalle_id' => (int) $detail->dped_cod_dped,
+                            ])->values()->all();
+                            $importadoPorDetalle = $this->resolveImportadoPorDetalle($pedidoDetallePairs);
 
                             $details = $details->map(function ($detail) use ($importadoPorDetalle) {
                                 $cantidadPedida = (float) ($detail->dped_can_ped ?? 0);
-                                $cantidadImportada = (float) ($importadoPorDetalle[$detail->dped_cod_dped] ?? 0);
+                                $key = ((int) $detail->dped_cod_pedi) . ':' . ((int) $detail->dped_cod_dped);
+                                $cantidadImportada = (float) ($importadoPorDetalle[$key] ?? 0);
                                 $cantidadPendiente = $cantidadPedida - $cantidadImportada;
 
                                 $detail->cantidad_importada = $cantidadImportada;

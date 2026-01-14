@@ -29,13 +29,13 @@ class ListSolicitudPagos extends ListRecords
         $model = SolicitudPagoResource::getModel();
 
         return [
-            'borrador' => Tab::make('Borrador')
+            'borrador' => Tab::make('Borrador y Pendiente asignar')
                 ->icon('heroicon-o-pencil-square')
                 ->badge(fn() => $model::where('estado', 'BORRADOR')->count())
                 ->badgeColor('warning')
                 ->modifyQueryUsing(fn(Builder $query) => $query->where('estado', 'BORRADOR')),
 
-            'aprobada' => Tab::make('Aprobada')
+            'aprobada' => Tab::make('Aprobada y enviada')
                 ->icon('heroicon-o-check-circle')
                 ->badge(fn() => $model::where('estado', 'APROBADA')->count())
                 ->badgeColor('success')
