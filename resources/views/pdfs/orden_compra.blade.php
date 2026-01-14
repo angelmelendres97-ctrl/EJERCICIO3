@@ -391,30 +391,55 @@
         @endphp
 
         @php
-            // Agrupa bases e IVA por porcentaje (solo si existen en detalles)
+            // ==============================
+            // RESUMEN POR TARIFA (BASE/DESC/IVA) - SOLO TARIFAS EXISTENTES
+            // ==============================
             $basePorIva = [];
+            $descPorIva = [];
             $ivaPorIva = [];
 
             foreach ($ordenCompra->detalles as $d) {
-                // Ajusta el nombre del campo si en tu detalle se llama distinto:
-                // impuesto / iva / porcentaje_iva, etc.
-                $rate = floatval($d->impuesto ?? 0);
+                $rate = (float) ($d->impuesto ?? 0);
 
-                $cantidad = floatval($d->cantidad ?? 0);
-                $costo = floatval($d->costo ?? 0);
+                $cantidad = (float) ($d->cantidad ?? 0);
+                $costo = (float) ($d->costo ?? 0);
+                $descuento = (float) ($d->descuento ?? 0);
 
                 $base = $cantidad * $costo;
 
                 $basePorIva[$rate] = ($basePorIva[$rate] ?? 0) + $base;
-                $ivaPorIva[$rate] = ($ivaPorIva[$rate] ?? 0) + $base * ($rate / 100);
+                $descPorIva[$rate] = ($descPorIva[$rate] ?? 0) + $descuento;
+
+                // IVA sobre base neta (base - descuento)
+                $baseNeta = max(0, $base - $descuento);
+                $ivaPorIva[$rate] = ($ivaPorIva[$rate] ?? 0) + $baseNeta * ($rate / 100);
             }
 
-            ksort($basePorIva, SORT_NUMERIC);
-            $totalImpuestosCalc = array_sum($ivaPorIva);
+            // Tarifas existentes: SOLO las que tienen base > 0
+            $tarifas = collect($basePorIva)
+                ->filter(fn($base) => round((float) $base, 6) > 0)
+                ->keys()
+                ->map(fn($r) => (float) $r)
+                ->values();
 
-            // Formato bonito para mostrar 0, 5, 15, 18 (sin .00)
+            // Orden personalizado (como tu formato): 15, 0, 5, 8, 18, ... (si existen)
+            $ordenPreferido = collect([15, 0, 5, 8, 18]);
+            $tarifas = $ordenPreferido
+                ->intersect($tarifas)
+                ->merge($tarifas->diff($ordenPreferido)->sort())
+                ->values();
+
+            // Totales generales
+            $subtotalGeneral = array_sum($basePorIva);
+            $descuentoGeneral = array_sum($descPorIva);
+            $ivaGeneral = array_sum($ivaPorIva);
+            $totalGeneral = $subtotalGeneral - $descuentoGeneral + $ivaGeneral;
+
+            // Helpers
             $fmtRate = fn($r) => rtrim(rtrim(number_format((float) $r, 2, '.', ''), '0'), '.');
+            $fmtMoney = fn($n) => number_format((float) $n, 2, '.', ',');
         @endphp
+
 
         <!-- RESUMEN (OBS + MINI INFO + TOTALES) -->
         <table class="resume-wrap">
@@ -449,43 +474,37 @@
                 <!-- DERECHA -->
                 <td class="resume-right">
                     <table class="totales">
+
+                        {{-- SUBTOTAL GENERAL --}}
                         <tr>
-                            <th style="width:60%" class="left">Subtotal</th>
-                            <td style="width:40%" class="right">$ {{ number_format($ordenCompra->subtotal, 2) }}</td>
+                            <th class="left">SUBTOTAL</th>
+                            <td class="right">$ {{ $fmtMoney($subtotalGeneral) }}</td>
                         </tr>
 
-                        <tr>
-                            <th class="left">Descuento</th>
-                            <td class="right">$ {{ number_format($ordenCompra->total_descuento, 2) }}</td>
-                        </tr>
-
-                        {{-- Filas dinámicas por IVA (solo si existen ítems con ese porcentaje) --}}
+                        {{-- TARIFA + IVA (intercalados, como factura real) --}}
                         @foreach ($basePorIva as $rate => $base)
                             @if (round($base, 6) > 0)
-                               {{--  <tr>
-                                    <th class="left">Subtotal IVA {{ $fmtRate($rate) }}%</th>
-                                    <td class="right">$ {{ number_format($base, 2) }}</td>
-                                </tr> --}}
                                 <tr>
-                                    <th class="left">IVA {{ $fmtRate($rate) }}%</th>
+                                    <th class="left">TARIFA {{ $fmtRate($rate) }} %</th>
+                                    <td class="right">$ {{ number_format($base, 2) }}</td>
+                                </tr>
+
+                                <tr>
+                                    <th class="left">IVA {{ $fmtRate($rate) }} %</th>
                                     <td class="right">$ {{ number_format($ivaPorIva[$rate] ?? 0, 2) }}</td>
                                 </tr>
                             @endif
                         @endforeach
 
-                        {{-- Total impuestos (si quieres mantener la fila “IVA” general) --}}
-                       {{--  <tr>
-                            <th class="left">IVA</th>
-                            <td class="right">
-                                $ {{ number_format($ordenCompra->total_impuesto ?? $totalImpuestosCalc, 2) }}
-                            </td>
-                        </tr> --}}
-
+                        {{-- TOTAL --}}
                         <tr>
-                            <th class="left">Total</th>
-                            <td class="right">$ {{ number_format($ordenCompra->total, 2) }}</td>
+                            <th class="left">TOTAL</th>
+                            <td class="right">$ {{ $fmtMoney($totalGeneral) }}</td>
                         </tr>
+
                     </table>
+
+
 
                 </td>
             </tr>

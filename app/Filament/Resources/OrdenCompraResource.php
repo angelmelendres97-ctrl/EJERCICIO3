@@ -231,7 +231,7 @@ class OrdenCompraResource extends Resource
                             ->label(fn(Get $get) => $get('formato') === 'P' ? 'Número de proforma' : 'Número de factura')
                             ->helperText('Ingrese el número según el formato seleccionado.')
                             ->visible(fn(Get $get) => filled($get('formato')))
-                            ->maxLength(255)->wrap()
+                            ->maxLength(255)
                             ->extraAttributes([
                                 'style' => 'max-width: 220px; white-space: normal; word-break: break-word;',
                             ]),
@@ -323,7 +323,8 @@ class OrdenCompraResource extends Resource
                                                     Step::make('Información Adicional')
                                                         ->schema([$schema[3]]),
                                                     Step::make('Empresas')
-                                                        ->schema([$schema[4]]),
+                                                        ->schema([$schema[4] ?? \Filament\Forms\Components\Placeholder::make('sin_empresas')->content('No hay sección "Empresas" en el schema.')]),
+
                                                 ])
                                             ])
                                             ->model(Proveedores::class);
@@ -501,21 +502,41 @@ class OrdenCompraResource extends Resource
                             ->modalWidth('7xl')
                             ->modalSubmitActionLabel('Registrar producto')
                             ->form(function (Form $form): Form {
-                                $schema = ProductoResource::getFormSchema();
+                                $schema = array_values(ProveedorResource::getFormSchema());
+
+                                $labels = [
+                                    'Información General',
+                                    'Clasificación',
+                                    'Retención',
+                                    'Información Adicional',
+                                    'Empresas',
+                                ];
+
+                                $steps = [];
+
+                                foreach ($labels as $i => $label) {
+                                    if (isset($schema[$i])) {
+                                        $steps[] = Step::make($label)->schema([$schema[$i]]);
+                                    }
+                                }
+
+                                // Si por alguna razón no vino nada, muestra un mensaje en el wizard
+                                if (empty($steps)) {
+                                    $steps[] = Step::make('Proveedor')
+                                        ->schema([
+                                            \Filament\Forms\Components\Placeholder::make('error_schema')
+                                                ->label('Error')
+                                                ->content('No se pudo cargar el formulario del proveedor (getFormSchema vacío).'),
+                                        ]);
+                                }
 
                                 return $form
                                     ->schema([
-                                        Wizard::make([
-                                            Step::make('Conexión e información principal')
-                                                ->schema([$schema[0]]),
-                                            Step::make('Información Producto')
-                                                ->schema([$schema[1]]),
-                                            Step::make('Sucursales y Bodegas Externas')
-                                                ->schema([$schema[2]]),
-                                        ])
+                                        Wizard::make($steps),
                                     ])
-                                    ->model(Producto::class);
+                                    ->model(Proveedores::class);
                             })
+
                             ->mountUsing(function (Action $action): void {
                                 $data = data_get($action->getLivewire(), 'data', []);
 

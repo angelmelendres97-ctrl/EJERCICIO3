@@ -26,6 +26,7 @@ use Filament\Forms\Components\Actions\Action;
 use Filament\Forms\Components\View;
 use Filament\Notifications\Notification;
 use Illuminate\Database\Eloquent\Model; // ESTA LÍNEA ES NECESARIA
+use Filament\Tables\Filters\Filter;
 
 class ResumenPedidosResource extends Resource
 {
@@ -134,6 +135,11 @@ class ResumenPedidosResource extends Resource
                                     ->label('Fecha Hasta')
                                     ->default(now()->endOfDay()),
                             ]),
+                        Forms\Components\Toggle::make('solo_mias')
+                            ->label('Solo mis órdenes')
+                            ->default(true)
+                            ->helperText('Si está activo, solo se listarán órdenes creadas por el usuario actual.')
+                            ->live(),
                         Forms\Components\Repeater::make('ordenes_compra')
                             ->schema([
                                 Forms\Components\TextInput::make('id_orden_compra')->label('Secuencial')->readOnly()->columnSpan(2),
@@ -181,7 +187,7 @@ class ResumenPedidosResource extends Resource
                                 }
 
                                 $ordenesExistentes = \App\Models\DetalleResumenPedidos::query()
-                                    ->whereHas('resumenPedido', fn ($query) => $query->where('anulada', false))
+                                    ->whereHas('resumenPedido', fn($query) => $query->where('anulada', false))
                                     ->pluck('id_orden_compra')
                                     ->all();
 
@@ -195,6 +201,14 @@ class ResumenPedidosResource extends Resource
                                 if (!empty($fecha_desde) && !empty($fecha_hasta)) {
                                     $query->whereBetween('fecha_pedido', [$fecha_desde, $fecha_hasta]);
                                 }
+
+                                $soloMias = (bool) $get('solo_mias');
+                                if ($soloMias) {
+                                    $query->whereBelongsTo(auth()->user(), 'usuario');
+                                }
+
+                                $ordenes = $query->get();
+
 
                                 $ordenes = $query->get();
 
@@ -288,7 +302,13 @@ class ResumenPedidosResource extends Resource
                     ->boolean(),
             ])
             ->filters([
-                //
+                Filter::make('mis_resumenes')
+                    ->label('Mis resumenes')
+                    ->query(
+                        fn(Builder $query): Builder =>
+                        $query->whereBelongsTo(auth()->user(), 'usuario')
+                    )
+                    ->default(),
             ])
             ->defaultSort('created_at', 'desc')
             ->actions([

@@ -218,21 +218,38 @@ class BuscarPedidosCompra extends Component implements HasForms, HasTable
         return array_keys($pendientes);
     }
 
-    private function resolveImportadoPorDetalle(array $detalleIds): array
-    {
-        if (empty($detalleIds)) {
-            return [];
-        }
-
-        return DetalleOrdenCompra::query()
-            ->select('pedido_detalle_id', DB::raw('SUM(cantidad) as cantidad_importada'))
-            ->whereIn('pedido_detalle_id', $detalleIds)
-            ->whereHas('ordenCompra', fn($query) => $query->where('anulada', false))
-            ->groupBy('pedido_detalle_id')
-            ->pluck('cantidad_importada', 'pedido_detalle_id')
-            ->map(fn($cantidad) => (float) $cantidad)
-            ->all();
+private function resolveImportadoPorDetalle(array $pedidoDetallePairs): array
+{
+    if (empty($pedidoDetallePairs)) {
+        return [];
     }
+
+    $pedidoCodigos = collect($pedidoDetallePairs)->pluck('pedido_codigo')->filter()->unique()->values()->all();
+    $detalleIds    = collect($pedidoDetallePairs)->pluck('pedido_detalle_id')->filter()->unique()->values()->all();
+
+    if (empty($pedidoCodigos) || empty($detalleIds)) {
+        return [];
+    }
+
+    $rows = DetalleOrdenCompra::query()
+        ->select([
+            'pedido_codigo',
+            'pedido_detalle_id',
+            DB::raw('SUM(cantidad) as cantidad_importada'),
+        ])
+        ->whereIn('pedido_codigo', $pedidoCodigos)
+        ->whereIn('pedido_detalle_id', $detalleIds)
+        ->whereHas('ordenCompra', fn($q) => $q->where('anulada', false))
+        ->groupBy('pedido_codigo', 'pedido_detalle_id')
+        ->get();
+
+    return $rows->mapWithKeys(function ($row) {
+        $key = ((int) $row->pedido_codigo) . ':' . ((int) $row->pedido_detalle_id);
+
+        return [$key => (float) $row->cantidad_importada];
+    })->all();
+}
+
 
     private function parsePedidosImportados(?string $value): array
     {
