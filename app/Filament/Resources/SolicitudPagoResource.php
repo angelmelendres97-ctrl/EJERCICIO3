@@ -8,6 +8,7 @@ use App\Models\Empresa;
 use App\Models\SolicitudPago;
 use App\Models\SolicitudPagoDetalle;
 use App\Models\SolicitudPagoAdjunto;
+use App\Services\SolicitudPagoReportService;
 use Filament\Forms\Components\DatePicker;
 use Filament\Forms\Components\FileUpload;
 use Filament\Forms\Components\Hidden;
@@ -1324,6 +1325,20 @@ class SolicitudPagoResource extends Resource
                             return $action->label('Guardar adjuntos');
                         })
                         ->modalCancelAction(fn(StaticAction $action) => $action->label('Cerrar')),
+
+                    Tables\Actions\Action::make('descargarPdf')
+                        ->label('Solicitud PDF')
+                        ->icon('heroicon-o-document-arrow-down')
+                        ->color('danger')
+                        ->visible(fn(SolicitudPago $record) => strtoupper($record->estado ?? '') === 'APROBADA')
+                        ->action(fn(SolicitudPago $record) => app(SolicitudPagoReportService::class)->exportPdf($record)),
+
+                    Tables\Actions\Action::make('descargarExcel')
+                        ->label('Solicitud EXCEL')
+                        ->icon('heroicon-o-table-cells')
+                        ->color('success')
+                        ->visible(fn(SolicitudPago $record) => strtoupper($record->estado ?? '') === 'APROBADA')
+                        ->action(fn(SolicitudPago $record) => app(SolicitudPagoReportService::class)->exportExcel($record)),
 
                     Tables\Actions\Action::make('gestionar')
                         ->label('Asignar abonos facturas')
