@@ -639,6 +639,7 @@ namespace App\Models {
     /**
      * App\Models\DetalleOrdenCompra
      *
+     * @property string|null $unidad
      * @property integer|null $pedido_detalle_id
      * @property integer|null $pedido_codigo
      * @property \Illuminate\Support\Carbon|null $updated_at
@@ -674,6 +675,7 @@ namespace App\Models {
      * @method static \Illuminate\Database\Eloquent\Builder<DetalleOrdenCompra>|DetalleOrdenCompra whereUpdatedAt($value)
      * @method static \Illuminate\Database\Eloquent\Builder<DetalleOrdenCompra>|DetalleOrdenCompra wherePedidoCodigo($value)
      * @method static \Illuminate\Database\Eloquent\Builder<DetalleOrdenCompra>|DetalleOrdenCompra wherePedidoDetalleId($value)
+     * @method static \Illuminate\Database\Eloquent\Builder<DetalleOrdenCompra>|DetalleOrdenCompra whereUnidad($value)
      * @method static \Illuminate\Database\Eloquent\Builder<DetalleOrdenCompra>|DetalleOrdenCompra newModelQuery()
      * @method static \Illuminate\Database\Eloquent\Builder<DetalleOrdenCompra>|DetalleOrdenCompra newQuery()
      * @method static \Illuminate\Database\Eloquent\Builder<DetalleOrdenCompra>|DetalleOrdenCompra query()

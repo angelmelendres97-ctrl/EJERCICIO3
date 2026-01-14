@@ -16,7 +16,7 @@ return new class extends Migration {
             $table->foreignId('id_orden_compra')->constrained('orden_compras');
             $table->integer('id_bodega');
             $table->string('bodega', 255); // SKU debe ser único
-
+            $table->string('unidad', 10)->nullable()->after('producto');
             // Campos de la imagen:
             $table->string('codigo_producto', 255); // SKU debe ser único
             $table->string('producto', 255);

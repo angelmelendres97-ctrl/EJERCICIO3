@@ -15,7 +15,7 @@
             x-cloak
             x-show="open"
             x-on:keydown.escape.window="open = false"
-            class="fixed inset-0 z-50 flex items-center justify-center"
+            class="fixed inset-0 z-50 flex items-center justify-center shadow-2xl border p-4"
         >
             <div class="absolute inset-0 bg-slate-900/50" x-on:click="open = false"></div>
             <div class="relative max-h-[80vh] w-[92vw] max-w-5xl overflow-hidden rounded-xl bg-white shadow-xl">
@@ -25,7 +25,7 @@
                         <div class="text-xs text-slate-500">{{ $facturasCount }} factura(s)</div>
                     </div>
                     <button type="button" class="text-slate-400 transition hover:text-slate-600" x-on:click="open = false">
-                        <x-heroicon-o-x-mark class="h-5 w-5" />
+                        <x-heroicon-o-x-mark style="color: red; padding: 10%;" class="h-5 w-5" />
                     </button>
                 </div>
                 <div class="max-h-[65vh] overflow-auto p-4">

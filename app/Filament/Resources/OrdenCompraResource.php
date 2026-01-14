@@ -578,6 +578,7 @@ class OrdenCompraResource extends Resource
                                             ->dehydrated(false)
                                             ->visible(fn(Get $get) => (bool) $get('es_auxiliar'))
                                             ->columnSpan(['default' => 12, 'lg' => 14]),
+                                        Forms\Components\Hidden::make('unidad'),
 
                                         Forms\Components\TextInput::make('producto_servicio')
                                             ->label('Servicio')

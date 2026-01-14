@@ -106,11 +106,21 @@ class CreateOrdenCompra extends CreateRecord
         $this->data['uso_compra'] = $motivo;
 
         $detalles = DB::connection($connectionName)
-            ->table('saedped')
-            ->whereIn('dped_cod_pedi', $pedidos)
-            ->where('dped_cod_empr', $this->data['amdg_id_empresa'])
-            ->where('dped_cod_sucu', $this->data['amdg_id_sucursal'])
+            ->table('saedped as d')
+            ->leftJoin('saeunid as u', function ($join) {
+                $join->on('u.unid_cod_unid', '=', 'd.dped_cod_unid');
+            })
+            ->whereIn('d.dped_cod_pedi', $pedidos)
+            ->where('d.dped_cod_empr', $this->data['amdg_id_empresa'])
+            ->where('d.dped_cod_sucu', $this->data['amdg_id_sucursal'])
+            ->select([
+                'd.*',
+                'u.unid_cod_unid',
+                'u.unid_nom_unid',
+                'u.unid_sigl_unid',
+            ])
             ->get();
+
 
         $pairs = $detalles->map(fn($d) => [
             'pedido_codigo'      => (int) $d->dped_cod_pedi,
@@ -124,6 +134,7 @@ class CreateOrdenCompra extends CreateRecord
             $key = ((int) $detalle->dped_cod_pedi) . ':' . ((int) $detalle->dped_cod_dped);
             $cantidadImportada = (float) ($importadoPorDetalle[$key] ?? 0);
             $cantidadPendiente = $cantidadPedida - $cantidadImportada;
+
 
             $detalle->cantidad_pendiente = $cantidadPendiente;
 
@@ -195,11 +206,16 @@ class CreateOrdenCompra extends CreateRecord
                 $productoLinea = $esServicio
                     ? ($detalle->dped_det_dped ?? $productoNombre)
                     : $productoNombre;
+                $unidadItem = $detalle->unid_abr_unid
+                    ?? $detalle->unid_nom_unid
+                    ?? 'UN';
+
 
                 return [
                     'id_bodega' => $id_bodega_item, // Set the correct warehouse for this line
                     'codigo_producto' => $codigoProducto,
                     'producto' => $productoLinea,
+                    'unidad' => $unidadItem,
                     'es_auxiliar' => $esAuxiliar,
                     'es_servicio' => $esServicio,
                     'producto_auxiliar' => $auxiliarDescripcion,

@@ -23,6 +23,7 @@ class DetalleOrdenCompra extends Model
         'valor_impuesto',
         'total',
         'detalle',
+        'unidad',
     ];
 
     // 5. Casting de Atributos (opcional)
