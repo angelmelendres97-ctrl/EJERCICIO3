@@ -1330,14 +1330,14 @@ class SolicitudPagoResource extends Resource
                         ->label('Solicitud PDF')
                         ->icon('heroicon-o-document-arrow-down')
                         ->color('danger')
-                        ->visible(fn(SolicitudPago $record) => strtoupper($record->estado ?? '') === 'APROBADA')
+                        ->visible(fn(SolicitudPago $record) => in_array(strtoupper($record->estado ?? ''), ['APROBADA', 'BORRADOR', 'PENDIENTE'], true))
                         ->action(fn(SolicitudPago $record) => app(SolicitudPagoReportService::class)->exportPdf($record)),
 
                     Tables\Actions\Action::make('descargarExcel')
                         ->label('Solicitud EXCEL')
                         ->icon('heroicon-o-table-cells')
                         ->color('success')
-                        ->visible(fn(SolicitudPago $record) => strtoupper($record->estado ?? '') === 'APROBADA')
+                        ->visible(fn(SolicitudPago $record) => in_array(strtoupper($record->estado ?? ''), ['APROBADA', 'BORRADOR', 'PENDIENTE'], true))
                         ->action(fn(SolicitudPago $record) => app(SolicitudPagoReportService::class)->exportExcel($record)),
 
                     Tables\Actions\Action::make('gestionar')

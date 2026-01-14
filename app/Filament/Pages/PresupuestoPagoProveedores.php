@@ -358,7 +358,7 @@ class PresupuestoPagoProveedores extends Page implements HasForms
             ->when(! empty($sucursales), fn($q) => $q->whereIn('erp_sucursal', $sucursales))
             ->whereHas('solicitudPago', function ($q) {
                 $q->whereNull('estado')
-                    ->orWhereNotIn('estado', ['ANULADA', 'RECHAZADA']);
+                    ->orWhereIn('estado', ['BORRADOR', 'PENDIENTE']);
             })
             ->get([
                 'erp_clave',
@@ -694,6 +694,7 @@ class PresupuestoPagoProveedores extends Page implements HasForms
                         ->required()
                         ->numeric()
                         ->prefix('$')
+                        ->default(fn() => $this->totalSeleccionado)
                         ->minValue(0.01)
                         ->rule('gt:0'),
 
@@ -767,16 +768,6 @@ class PresupuestoPagoProveedores extends Page implements HasForms
 
         $montoEstimado = $this->totalSeleccionado;
         $montoAprobado = (float) ($data['monto_aprobado'] ?? 0);
-
-        if ($montoAprobado > $montoEstimado) {
-            Notification::make()
-                ->title('El monto aprobado no puede superar el monto estimado')
-                ->warning()
-                ->body('Verifique los valores seleccionados antes de continuar.')
-                ->send();
-
-            return;
-        }
 
         if ($montoAprobado <= 0) {
             Notification::make()
