@@ -12,7 +12,6 @@ use Filament\Tables\Table;
 use App\Models\Empresa;
 use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\DB;
-use Filament\Forms\Get;
 use Filament\Forms\Set;
 use App\Filament\Resources\ProveedorResource;
 use App\Filament\Resources\ProductoResource;
@@ -27,7 +26,7 @@ use Filament\Forms\Components\Grid;
 use Filament\Forms\Components\Wizard;
 use Filament\Forms\Components\Wizard\Step;
 use Filament\Tables\Filters\Filter;
-
+use Filament\Forms\Get;
 use Filament\Forms\Components\Actions\Action;
 use Filament\Forms\Components\Actions;
 use Filament\Forms\Components\View;
@@ -344,18 +343,20 @@ class OrdenCompraResource extends Resource
                                             ])
                                             ->model(Proveedores::class);
                                     })
-                                    ->mountUsing(function (Action $action): void {
-                                        // En un modal dentro de un form, esto suele estar en $livewire->data
-                                        $data = data_get($action->getLivewire(), 'data', []);
-
+                                    ->mountUsing(function (Action $action, Get $get): void {
                                         $action->fillForm([
-                                            'id_empresa'       => $data['id_empresa'] ?? null,
-                                            'amdg_id_empresa'  => $data['amdg_id_empresa'] ?? null,
-                                            'amdg_id_sucursal' => $data['amdg_id_sucursal'] ?? null,
+                                            'id_empresa'       => $get('id_empresa'),
+                                            'admg_id_empresa'  => $get('amdg_id_empresa'),
+                                            'admg_id_sucursal' => $get('amdg_id_sucursal'),
                                         ]);
                                     })
 
+
                                     ->action(function (array $data, Set $set, Get $get): void {
+
+
+
+
                                         $record = Proveedores::create($data);
                                         $lineasNegocioIds = $data['lineasNegocio'] ?? [];
                                         if (!empty($lineasNegocioIds)) {
