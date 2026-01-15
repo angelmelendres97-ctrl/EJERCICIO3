@@ -74,6 +74,7 @@ class ProveedorResource extends Resource
                         ->searchable()
                         ->preload()
                         ->live()
+
                         ->afterStateUpdated(function (callable $set): void {
                             $set('admg_id_empresa', null);
                             $set('admg_id_sucursal', null);
@@ -748,9 +749,9 @@ class ProveedorResource extends Resource
                     ->visible(fn() => auth()->user()->can('Actualizar')),
                 Tables\Actions\DeleteAction::make()
                     ->visible(fn() => auth()->user()->can('Borrar')),
-            
-                    ])
-            
+
+            ])
+
             ->bulkActions(
                 [
                     Tables\Actions\DeleteBulkAction::make()

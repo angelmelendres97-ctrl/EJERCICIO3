@@ -345,14 +345,16 @@ class OrdenCompraResource extends Resource
                                             ->model(Proveedores::class);
                                     })
                                     ->mountUsing(function (Action $action): void {
+                                        // En un modal dentro de un form, esto suele estar en $livewire->data
                                         $data = data_get($action->getLivewire(), 'data', []);
 
                                         $action->fillForm([
-                                            'id_empresa' => $data['id_empresa'] ?? null,
-                                            'admg_id_empresa' => $data['amdg_id_empresa'] ?? null,
-                                            'admg_id_sucursal' => $data['amdg_id_sucursal'] ?? null,
+                                            'id_empresa'       => $data['id_empresa'] ?? null,
+                                            'amdg_id_empresa'  => $data['amdg_id_empresa'] ?? null,
+                                            'amdg_id_sucursal' => $data['amdg_id_sucursal'] ?? null,
                                         ]);
                                     })
+
                                     ->action(function (array $data, Set $set, Get $get): void {
                                         $record = Proveedores::create($data);
                                         $lineasNegocioIds = $data['lineasNegocio'] ?? [];
@@ -1171,6 +1173,7 @@ class OrdenCompraResource extends Resource
                 Tables\Columns\TextColumn::make('id')
                     ->label('Código OC')
                     ->searchable()
+                    ->searchable(isIndividual: true)
                     ->sortable(),
 
                 Tables\Columns\TextColumn::make('empresa.nombre_empresa')
@@ -1197,6 +1200,7 @@ class OrdenCompraResource extends Resource
                     ->label('N° Fact/Proforma')
                     ->searchable()
                     ->sortable()
+                    ->searchable(isIndividual: true)
                     ->toggleable(),
 
                 Tables\Columns\TextColumn::make('amdg_id_empresa')
@@ -1243,6 +1247,8 @@ class OrdenCompraResource extends Resource
 
                 Tables\Columns\TextColumn::make('pedidos_importados')
                     ->label('Pedidos Importados')
+                    ->searchable()
+                    ->searchable(isIndividual: true)
                     ->sortable(),
                 Tables\Columns\TextColumn::make('amdg_id_sucursal')
                     ->label('Sucursal')
