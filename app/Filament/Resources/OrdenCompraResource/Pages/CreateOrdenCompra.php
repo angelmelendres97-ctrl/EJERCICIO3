@@ -105,9 +105,22 @@ class CreateOrdenCompra extends CreateRecord
 
         $this->data['uso_compra'] = $motivo;
 
+        $unidades = DB::connection($connectionName)
+            ->table('saeunid')
+            ->select([
+                'unid_cod_unid',
+                DB::raw('MAX(unid_nom_unid) as unid_nom_unid'),
+                DB::raw('MAX(unid_sigl_unid) as unid_sigl_unid'),
+            ])
+            ->when(
+                DB::connection($connectionName)->getSchemaBuilder()->hasColumn('saeunid', 'unid_cod_empr'),
+                fn($q) => $q->where('unid_cod_empr', $this->data['amdg_id_empresa'])
+            )
+            ->groupBy('unid_cod_unid');
+
         $detalles = DB::connection($connectionName)
             ->table('saedped as d')
-            ->leftJoin('saeunid as u', function ($join) {
+            ->leftJoinSub($unidades, 'u', function ($join) {
                 $join->on('u.unid_cod_unid', '=', 'd.dped_cod_unid');
             })
             ->whereIn('d.dped_cod_pedi', $pedidos)
@@ -299,11 +312,6 @@ class CreateOrdenCompra extends CreateRecord
 
     private function resolveImportadoPorDetalle(array $pedidoDetallePairs): array
     {
-        // $pedidoDetallePairs = [
-        //   ['pedido_codigo' => 123, 'pedido_detalle_id' => 456],
-        //   ...
-        // ];
-
         if (empty($pedidoDetallePairs)) {
             return [];
         }
@@ -315,6 +323,10 @@ class CreateOrdenCompra extends CreateRecord
             return [];
         }
 
+        $idEmpresa   = $this->data['id_empresa'] ?? null;
+        $amdgEmpresa = $this->data['amdg_id_empresa'] ?? null;
+        $amdgSucu    = $this->data['amdg_id_sucursal'] ?? null;
+
         $rows = DetalleOrdenCompra::query()
             ->select([
                 'pedido_codigo',
@@ -323,17 +335,22 @@ class CreateOrdenCompra extends CreateRecord
             ])
             ->whereIn('pedido_codigo', $pedidoCodigos)
             ->whereIn('pedido_detalle_id', $detalleIds)
-            ->whereHas('ordenCompra', fn($q) => $q->where('anulada', false))
+            ->whereHas('ordenCompra', function ($q) use ($idEmpresa, $amdgEmpresa, $amdgSucu) {
+                $q->where('anulada', false);
+
+                if ($idEmpresa)   $q->where('id_empresa', $idEmpresa);
+                if ($amdgEmpresa) $q->where('amdg_id_empresa', $amdgEmpresa);
+                if ($amdgSucu)    $q->where('amdg_id_sucursal', $amdgSucu);
+            })
             ->groupBy('pedido_codigo', 'pedido_detalle_id')
             ->get();
 
-        // Key compuesta: "pedido:detalle"
         return $rows->mapWithKeys(function ($row) {
             $key = ((int) $row->pedido_codigo) . ':' . ((int) $row->pedido_detalle_id);
-
             return [$key => (float) $row->cantidad_importada];
         })->all();
     }
+
 
 
     private function isServicioItem(?string $codigoProducto): bool

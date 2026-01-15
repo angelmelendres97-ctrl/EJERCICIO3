@@ -116,6 +116,11 @@ class OrdenCompraResource extends Resource
                             ->searchable()
                             ->preload()
                             ->live()
+                            ->afterStateUpdated(function (Set $set) {
+                                $set('pedidos_importados', null);
+                                $set('detalles', []);
+                            })
+
                             ->required(),
 
                         Forms\Components\Select::make('amdg_id_empresa')
@@ -142,6 +147,11 @@ class OrdenCompraResource extends Resource
                             })
                             ->searchable()
                             ->live()
+                            ->afterStateUpdated(function (Set $set) {
+                                $set('pedidos_importados', null);
+                                $set('detalles', []);
+                            })
+
                             ->required(),
 
                         Forms\Components\Select::make('amdg_id_sucursal')
@@ -171,6 +181,11 @@ class OrdenCompraResource extends Resource
                             })
                             ->searchable()
                             ->live()
+                            ->afterStateUpdated(function (Set $set) {
+                                $set('pedidos_importados', null);
+                                $set('detalles', []);
+                            })
+
                             ->required(),
                     ])->columns(3),
 
@@ -1161,6 +1176,7 @@ class OrdenCompraResource extends Resource
                 Tables\Columns\TextColumn::make('empresa.nombre_empresa')
                     ->label('Conexión')
                     ->sortable()
+                    ->searchable()
                     ->toggleable(isToggledHiddenByDefault: true),
                 Tables\Columns\TextColumn::make('formato')
                     ->label('Formato')
@@ -1296,7 +1312,8 @@ class OrdenCompraResource extends Resource
                 Tables\Columns\TextColumn::make('uso_compra')
                     ->label('Uso Compra')
                     ->toggleable(isToggledHiddenByDefault: true)
-                    ->sortable(),
+                    ->sortable()
+                    ->searchable(),
 
                 Tables\Columns\TextColumn::make('solicitado_por')
                     ->label('Solicitado Por')
