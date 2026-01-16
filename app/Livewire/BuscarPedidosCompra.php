@@ -116,8 +116,8 @@ class BuscarPedidosCompra extends Component implements HasForms, HasTable
             ->leftJoin('saedped', function ($join) {
                 $join->on('saedped.dped_cod_pedi', '=', 'saepedi.pedi_cod_pedi');
                 // Si tu tabla de detalle tiene empresa/sucursal, puedes amarrarlo aquí también si aplica:
-                // $join->on('saedped.dped_cod_empr', '=', 'saepedi.pedi_cod_empr');
-                // $join->on('saedped.dped_cod_sucu', '=', 'saepedi.pedi_cod_sucu');
+                $join->on('saedped.dped_cod_empr', '=', 'saepedi.pedi_cod_empr');
+                $join->on('saedped.dped_cod_sucu', '=', 'saepedi.pedi_cod_sucu');
             })
             ->where('saepedi.pedi_cod_empr', $this->amdg_id_empresa)
             ->where('saepedi.pedi_cod_sucu', $this->amdg_id_sucursal);
@@ -243,13 +243,17 @@ class BuscarPedidosCompra extends Component implements HasForms, HasTable
             ])
             ->whereIn('pedido_codigo', $pedidoCodigos)
             ->whereIn('pedido_detalle_id', $detalleIds)
-            ->whereHas('ordenCompra', fn($q) => $q->where('anulada', false))
+            ->whereHas('ordenCompra', function ($q) {
+                $q->where('anulada', false)
+                    ->where('id_empresa', $this->id_empresa)
+                    ->where('amdg_id_empresa', $this->amdg_id_empresa)
+                    ->where('amdg_id_sucursal', $this->amdg_id_sucursal);
+            })
             ->groupBy('pedido_codigo', 'pedido_detalle_id')
             ->get();
 
         return $rows->mapWithKeys(function ($row) {
             $key = ((int) $row->pedido_codigo) . ':' . ((int) $row->pedido_detalle_id);
-
             return [$key => (float) $row->cantidad_importada];
         })->all();
     }

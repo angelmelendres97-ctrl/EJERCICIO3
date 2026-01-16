@@ -12,7 +12,6 @@ use Filament\Tables\Table;
 use App\Models\Empresa;
 use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\DB;
-use Filament\Forms\Get;
 use Filament\Forms\Set;
 use App\Filament\Resources\ProveedorResource;
 use App\Filament\Resources\ProductoResource;
@@ -27,7 +26,7 @@ use Filament\Forms\Components\Grid;
 use Filament\Forms\Components\Wizard;
 use Filament\Forms\Components\Wizard\Step;
 use Filament\Tables\Filters\Filter;
-
+use Filament\Forms\Get;
 use Filament\Forms\Components\Actions\Action;
 use Filament\Forms\Components\Actions;
 use Filament\Forms\Components\View;
@@ -116,6 +115,11 @@ class OrdenCompraResource extends Resource
                             ->searchable()
                             ->preload()
                             ->live()
+                            ->afterStateUpdated(function (Set $set) {
+                                $set('pedidos_importados', null);
+                                $set('detalles', []);
+                            })
+
                             ->required(),
 
                         Forms\Components\Select::make('amdg_id_empresa')
@@ -142,6 +146,11 @@ class OrdenCompraResource extends Resource
                             })
                             ->searchable()
                             ->live()
+                            ->afterStateUpdated(function (Set $set) {
+                                $set('pedidos_importados', null);
+                                $set('detalles', []);
+                            })
+
                             ->required(),
 
                         Forms\Components\Select::make('amdg_id_sucursal')
@@ -171,6 +180,11 @@ class OrdenCompraResource extends Resource
                             })
                             ->searchable()
                             ->live()
+                            ->afterStateUpdated(function (Set $set) {
+                                $set('pedidos_importados', null);
+                                $set('detalles', []);
+                            })
+
                             ->required(),
                     ])->columns(3),
 
@@ -329,16 +343,20 @@ class OrdenCompraResource extends Resource
                                             ])
                                             ->model(Proveedores::class);
                                     })
-                                    ->mountUsing(function (Action $action): void {
-                                        $data = data_get($action->getLivewire(), 'data', []);
-
+                                    ->mountUsing(function (Action $action, Get $get): void {
                                         $action->fillForm([
-                                            'id_empresa' => $data['id_empresa'] ?? null,
-                                            'admg_id_empresa' => $data['amdg_id_empresa'] ?? null,
-                                            'admg_id_sucursal' => $data['amdg_id_sucursal'] ?? null,
+                                            'id_empresa'       => $get('id_empresa'),
+                                            'admg_id_empresa'  => $get('amdg_id_empresa'),
+                                            'admg_id_sucursal' => $get('amdg_id_sucursal'),
                                         ]);
                                     })
+
+
                                     ->action(function (array $data, Set $set, Get $get): void {
+
+
+
+
                                         $record = Proveedores::create($data);
                                         $lineasNegocioIds = $data['lineasNegocio'] ?? [];
                                         if (!empty($lineasNegocioIds)) {
@@ -1156,11 +1174,13 @@ class OrdenCompraResource extends Resource
                 Tables\Columns\TextColumn::make('id')
                     ->label('Código OC')
                     ->searchable()
+                    ->searchable(isIndividual: true)
                     ->sortable(),
 
                 Tables\Columns\TextColumn::make('empresa.nombre_empresa')
                     ->label('Conexión')
                     ->sortable()
+                    ->searchable()
                     ->toggleable(isToggledHiddenByDefault: true),
                 Tables\Columns\TextColumn::make('formato')
                     ->label('Formato')
@@ -1181,6 +1201,7 @@ class OrdenCompraResource extends Resource
                     ->label('N° Fact/Proforma')
                     ->searchable()
                     ->sortable()
+                    ->searchable(isIndividual: true)
                     ->toggleable(),
 
                 Tables\Columns\TextColumn::make('amdg_id_empresa')
@@ -1227,6 +1248,8 @@ class OrdenCompraResource extends Resource
 
                 Tables\Columns\TextColumn::make('pedidos_importados')
                     ->label('Pedidos Importados')
+                    ->searchable()
+                    ->searchable(isIndividual: true)
                     ->sortable(),
                 Tables\Columns\TextColumn::make('amdg_id_sucursal')
                     ->label('Sucursal')
@@ -1296,7 +1319,8 @@ class OrdenCompraResource extends Resource
                 Tables\Columns\TextColumn::make('uso_compra')
                     ->label('Uso Compra')
                     ->toggleable(isToggledHiddenByDefault: true)
-                    ->sortable(),
+                    ->sortable()
+                    ->searchable(),
 
                 Tables\Columns\TextColumn::make('solicitado_por')
                     ->label('Solicitado Por')

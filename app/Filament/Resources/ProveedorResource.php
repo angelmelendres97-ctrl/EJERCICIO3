@@ -74,10 +74,19 @@ class ProveedorResource extends Resource
                         ->searchable()
                         ->preload()
                         ->live()
-                        ->afterStateUpdated(function (callable $set): void {
-                            $set('admg_id_empresa', null);
-                            $set('admg_id_sucursal', null);
+
+                        ->afterStateUpdated(function (callable $set, $state, $old): void {
+                            // Si solo se está hidratando y no hubo cambio real, no limpies
+                            if ($old === null) {
+                                return;
+                            }
+
+                            if ($state !== $old) {
+                                $set('admg_id_empresa', null);
+                                $set('admg_id_sucursal', null);
+                            }
                         })
+
                         ->required(),
 
                     Forms\Components\Select::make('admg_id_empresa')
@@ -748,9 +757,9 @@ class ProveedorResource extends Resource
                     ->visible(fn() => auth()->user()->can('Actualizar')),
                 Tables\Actions\DeleteAction::make()
                     ->visible(fn() => auth()->user()->can('Borrar')),
-            
-                    ])
-            
+
+            ])
+
             ->bulkActions(
                 [
                     Tables\Actions\DeleteBulkAction::make()
