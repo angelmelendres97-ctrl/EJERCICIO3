@@ -13,8 +13,8 @@ class Proveedores extends Model
 
     protected $fillable = [
         'id_empresa',
-        'admg_id_empresa',
-        'admg_id_sucursal',
+        'amdg_id_empresa',
+        'amdg_id_sucursal',
         'tipo',
         'ruc',
         'nombre',
@@ -33,6 +33,7 @@ class Proveedores extends Model
         'direcccion',
         'correo',
     ];
+
 
     public function lineasNegocio()
     {
