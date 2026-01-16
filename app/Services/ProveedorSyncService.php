@@ -30,9 +30,9 @@ class ProveedorSyncService
         $selectedEmpresasByEmpresa = [];
         if (!empty($data['empresas_proveedor'])) {
             foreach ($data['empresas_proveedor'] as $empresaValue) {
-                // El formato es 'empresa_id-admg_empresa'
-                list($empresaId, $admg_empresa) = explode('-', $empresaValue, 2);
-                $selectedEmpresasByEmpresa[(int)$empresaId] = trim($admg_empresa);
+                // El formato es 'empresa_id-amdg_empresa'
+                list($empresaId, $amdg_empresa) = explode('-', $empresaValue, 2);
+                $selectedEmpresasByEmpresa[(int)$empresaId] = trim($amdg_empresa);
             }
         }
 
@@ -41,7 +41,6 @@ class ProveedorSyncService
         }
 
         // 2. Extraer datos comunes del formulario
-        $admg_id_empresa = $data['admg_id_empresa'];
         $tipo_documento = $data['tipo'];
         $identificacion = $data['ruc'];
         $nombre = strtoupper($data['nombre']);
@@ -65,7 +64,7 @@ class ProveedorSyncService
 
 
         // 3. Iterar sobre cada empresa seleccionada
-        foreach ($selectedEmpresasByEmpresa as $empresaId => $admg_empresa) {
+        foreach ($selectedEmpresasByEmpresa as $empresaId => $amdg_empresa) {
             $conexionPgsql = null;
             $empresa = null;
 
@@ -87,36 +86,36 @@ class ProveedorSyncService
                 // 4. Obtener códigos de referencia
 
                 // Sucursal por defecto
-                $sql_sucursal_default = DB::connection($conexionPgsql)->table('saesucu')->where('sucu_cod_empr', $admg_empresa)->first();
-                $admg_sucursal = $sql_sucursal_default ? $sql_sucursal_default->sucu_cod_sucu : 1;
+                $sql_sucursal_default = DB::connection($conexionPgsql)->table('saesucu')->where('sucu_cod_empr', $amdg_empresa)->first();
+                $amdg_sucursal = $sql_sucursal_default ? $sql_sucursal_default->sucu_cod_sucu : 1;
 
                 // tipo documento
                 $sql_tipo_iden = DB::connection($conexionPgsql)->table('comercial.tipo_iden_clpv')->where('identificacion', $tipo_documento)->first();
                 $id_iden_clpv = $sql_tipo_iden ? $sql_tipo_iden->tipo : '01';
 
                 // grupo
-                $sql_saegrpv = DB::connection($conexionPgsql)->table('saegrpv')->where('grpv_nom_grpv', $grupo)->where('grpv_cod_empr', $admg_empresa)->first();
+                $sql_saegrpv = DB::connection($conexionPgsql)->table('saegrpv')->where('grpv_nom_grpv', $grupo)->where('grpv_cod_empr', $amdg_empresa)->first();
                 $grpv_cod_grpv = $sql_saegrpv ? $sql_saegrpv->grpv_cod_grpv : 1;
                 $grpv_cta_grpv = $sql_saegrpv ? $sql_saegrpv->grpv_cta_grpv : '';
 
                 // zona
-                $sql_saezona = DB::connection($conexionPgsql)->table('saezona')->where('zona_nom_zona', $zona)->where('zona_cod_empr', $admg_empresa)->first();
+                $sql_saezona = DB::connection($conexionPgsql)->table('saezona')->where('zona_nom_zona', $zona)->where('zona_cod_empr', $amdg_empresa)->first();
                 $zona_cod_zona = $sql_saezona ? $sql_saezona->zona_cod_zona : 1;
 
                 // flujo de caja
-                $sql_saecact = DB::connection($conexionPgsql)->table('saecact')->where('cact_nom_cact', $flujo_caja)->where('cact_cod_empr', $admg_empresa)->first();
+                $sql_saecact = DB::connection($conexionPgsql)->table('saecact')->where('cact_nom_cact', $flujo_caja)->where('cact_cod_empr', $amdg_empresa)->first();
                 $cact_cod_cact = $sql_saecact ? $sql_saecact->cact_cod_cact : 1;
 
                 // tipo proveedor
-                $sql_saetprov = DB::connection($conexionPgsql)->table('saetprov')->where('tprov_des_tprov', $tipo_proveedor)->where('tprov_cod_empr', $admg_empresa)->first();
+                $sql_saetprov = DB::connection($conexionPgsql)->table('saetprov')->where('tprov_des_tprov', $tipo_proveedor)->where('tprov_cod_empr', $amdg_empresa)->first();
                 $tprov_cod_tprov = $sql_saetprov ? $sql_saetprov->tprov_cod_tprov : 1;
 
                 // forma pago
-                $sql_saefpagop = DB::connection($conexionPgsql)->table('saefpagop')->where('fpagop_des_fpagop', $forma_pago)->where('fpagop_cod_empr', $admg_empresa)->first();
+                $sql_saefpagop = DB::connection($conexionPgsql)->table('saefpagop')->where('fpagop_des_fpagop', $forma_pago)->where('fpagop_cod_empr', $amdg_empresa)->first();
                 $fpagop_cod_fpagop = $sql_saefpagop ? $sql_saefpagop->fpagop_cod_fpagop : 1;
 
                 // destino pago
-                $sql_saetpago = DB::connection($conexionPgsql)->table('saetpago')->where('tpago_des_tpago', $destino_pago)->where('tpago_cod_empr', $admg_empresa)->first();
+                $sql_saetpago = DB::connection($conexionPgsql)->table('saetpago')->where('tpago_des_tpago', $destino_pago)->where('tpago_cod_empr', $amdg_empresa)->first();
                 $tpago_cod_tpago = $sql_saetpago ? $sql_saetpago->tpago_cod_tpago : 1;
 
                 // destino pago
@@ -126,7 +125,7 @@ class ProveedorSyncService
 
                 // 5. Buscar o crear/actualizar saeclpv
                 $existeProveedor = DB::connection($conexionPgsql)->table('saeclpv')
-                    ->where('clpv_cod_empr', $admg_empresa)
+                    ->where('clpv_cod_empr', $amdg_empresa)
                     ->where('clpv_ruc_clpv', $identificacion)
                     ->where('clv_con_clpv', $id_iden_clpv)
                     ->where('clpv_clopv_clpv', 'PV')
@@ -135,8 +134,8 @@ class ProveedorSyncService
                 $clpv_cod_clpv = $existeProveedor ? $existeProveedor->clpv_cod_clpv : null;
 
                 $proveedorData = [
-                    'clpv_cod_sucu' => $admg_sucursal,
-                    'clpv_cod_empr' => $admg_empresa,
+                    'clpv_cod_sucu' => $amdg_sucursal,
+                    'clpv_cod_empr' => $amdg_empresa,
                     'clpv_cod_cuen' => $grpv_cta_grpv,
                     'clpv_cod_zona' => $zona_cod_zona,
                     'clv_con_clpv' => $id_iden_clpv,
@@ -184,15 +183,15 @@ class ProveedorSyncService
                 if (!empty($clpv_cod_clpv) && !empty($telefono)) {
                     DB::connection($conexionPgsql)
                         ->table('saetlcp')
-                        ->where('tlcp_cod_empr', $admg_empresa)
-                        ->where('tlcp_cod_sucu', $admg_sucursal)
+                        ->where('tlcp_cod_empr', $amdg_empresa)
+                        ->where('tlcp_cod_sucu', $amdg_sucursal)
                         ->where('tlcp_cod_clpv', $clpv_cod_clpv)
                         ->where('tlcp_tlf_tlcp', $telefono)
                         ->delete();
 
                     DB::connection($conexionPgsql)->table('saetlcp')->insert([
-                        'tlcp_cod_empr' => $admg_empresa,
-                        'tlcp_cod_sucu' => $admg_sucursal,
+                        'tlcp_cod_empr' => $amdg_empresa,
+                        'tlcp_cod_sucu' => $amdg_sucursal,
                         'tlcp_cod_clpv' => $clpv_cod_clpv,
                         'tlcp_tlf_tlcp' => $telefono,
                     ]);
@@ -202,15 +201,15 @@ class ProveedorSyncService
                 if (!empty($clpv_cod_clpv) && !empty($correo)) {
                     DB::connection($conexionPgsql)
                         ->table('saeemai')
-                        ->where('emai_cod_empr', $admg_empresa)
-                        ->where('emai_cod_sucu', $admg_sucursal)
+                        ->where('emai_cod_empr', $amdg_empresa)
+                        ->where('emai_cod_sucu', $amdg_sucursal)
                         ->where('emai_cod_clpv', $clpv_cod_clpv)
                         ->where('emai_ema_emai', $correo)
                         ->delete();
 
                     DB::connection($conexionPgsql)->table('saeemai')->insert([
-                        'emai_cod_empr' => $admg_empresa,
-                        'emai_cod_sucu' => $admg_sucursal,
+                        'emai_cod_empr' => $amdg_empresa,
+                        'emai_cod_sucu' => $amdg_sucursal,
                         'emai_cod_clpv' => $clpv_cod_clpv,
                         'emai_ema_emai' => $correo,
                     ]);
@@ -220,15 +219,15 @@ class ProveedorSyncService
                 if (!empty($clpv_cod_clpv) && !empty($direcccion)) {
                     DB::connection($conexionPgsql)
                         ->table('saedire')
-                        ->where('dire_cod_empr', $admg_empresa)
-                        ->where('dire_cod_sucu', $admg_sucursal)
+                        ->where('dire_cod_empr', $amdg_empresa)
+                        ->where('dire_cod_sucu', $amdg_sucursal)
                         ->where('dire_cod_clpv', $clpv_cod_clpv)
                         ->where('dire_dir_dire', $direcccion)
                         ->delete();
 
                     DB::connection($conexionPgsql)->table('saedire')->insert([
-                        'dire_cod_empr' => $admg_empresa,
-                        'dire_cod_sucu' => $admg_sucursal,
+                        'dire_cod_empr' => $amdg_empresa,
+                        'dire_cod_sucu' => $amdg_sucursal,
                         'dire_cod_clpv' => $clpv_cod_clpv,
                         'dire_dir_dire' => $direcccion,
                         'dire_est_dire' => 'A',
