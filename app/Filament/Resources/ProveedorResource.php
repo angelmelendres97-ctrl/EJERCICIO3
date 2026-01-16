@@ -82,14 +82,14 @@ class ProveedorResource extends Resource
                             }
 
                             if ($state !== $old) {
-                                $set('admg_id_empresa', null);
-                                $set('admg_id_sucursal', null);
+                                $set('amdg_id_empresa', null);
+                                $set('amdg_id_sucursal', null);
                             }
                         })
 
                         ->required(),
 
-                    Forms\Components\Select::make('admg_id_empresa')
+                    Forms\Components\Select::make('amdg_id_empresa')
                         ->label('Empresa')
                         ->options(function (Get $get) {
                             $empresaId = $get('id_empresa');
@@ -115,14 +115,14 @@ class ProveedorResource extends Resource
                         ->searchable()
                         ->preload()
                         ->live()
-                        ->afterStateUpdated(fn(callable $set) => $set('admg_id_sucursal', null))
+                        ->afterStateUpdated(fn(callable $set) => $set('amdg_id_sucursal', null))
                         ->required(),
 
-                    Forms\Components\Select::make('admg_id_sucursal')
+                    Forms\Components\Select::make('amdg_id_sucursal')
                         ->label('Sucursal')
                         ->options(function (Get $get) {
                             $empresaId = $get('id_empresa');
-                            $amdgIdEmpresaCode = $get('admg_id_empresa');
+                            $amdgIdEmpresaCode = $get('amdg_id_empresa');
 
                             if (!$empresaId || !$amdgIdEmpresaCode) {
                                 return [];
@@ -153,7 +153,7 @@ class ProveedorResource extends Resource
                         ->label('Tipo Identificacion')
                         ->options(function (Get $get) {
                             $empresaId = $get('id_empresa');
-                            $amdgIdEmpresaCode = $get('admg_id_empresa');
+                            $amdgIdEmpresaCode = $get('amdg_id_empresa');
 
                             if (!$empresaId || !$amdgIdEmpresaCode) {
                                 return [];
@@ -316,7 +316,7 @@ class ProveedorResource extends Resource
                         ->label('Grupo')
                         ->options(function (Get $get) {
                             $empresaId = $get('id_empresa');
-                            $amdgIdEmpresaCode = $get('admg_id_empresa');
+                            $amdgIdEmpresaCode = $get('amdg_id_empresa');
 
                             if (!$empresaId || !$amdgIdEmpresaCode) {
                                 return [];
@@ -347,7 +347,7 @@ class ProveedorResource extends Resource
                         ->label('Zona')
                         ->options(function (Get $get) {
                             $empresaId = $get('id_empresa');
-                            $amdgIdEmpresaCode = $get('admg_id_empresa');
+                            $amdgIdEmpresaCode = $get('amdg_id_empresa');
 
                             if (!$empresaId || !$amdgIdEmpresaCode) {
                                 return [];
@@ -376,7 +376,7 @@ class ProveedorResource extends Resource
                         ->label('Flujo de Caja')
                         ->options(function (Get $get) {
                             $empresaId = $get('id_empresa');
-                            $amdgIdEmpresaCode = $get('admg_id_empresa');
+                            $amdgIdEmpresaCode = $get('amdg_id_empresa');
 
                             if (!$empresaId || !$amdgIdEmpresaCode) {
                                 return [];
@@ -405,7 +405,7 @@ class ProveedorResource extends Resource
                         ->label('Tipo de proveedor')
                         ->options(function (Get $get) {
                             $empresaId = $get('id_empresa');
-                            $amdgIdEmpresaCode = $get('admg_id_empresa');
+                            $amdgIdEmpresaCode = $get('amdg_id_empresa');
 
                             if (!$empresaId || !$amdgIdEmpresaCode) {
                                 return [];
@@ -439,7 +439,7 @@ class ProveedorResource extends Resource
                         ->label('Forma de Pago')
                         ->options(function (Get $get) {
                             $empresaId = $get('id_empresa');
-                            $amdgIdEmpresaCode = $get('admg_id_empresa');
+                            $amdgIdEmpresaCode = $get('amdg_id_empresa');
 
                             if (!$empresaId || !$amdgIdEmpresaCode) {
                                 return [];
@@ -468,7 +468,7 @@ class ProveedorResource extends Resource
                         ->label('Destino Pago')
                         ->options(function (Get $get) {
                             $empresaId = $get('id_empresa');
-                            $amdgIdEmpresaCode = $get('admg_id_empresa');
+                            $amdgIdEmpresaCode = $get('amdg_id_empresa');
 
                             if (!$empresaId || !$amdgIdEmpresaCode) {
                                 return [];
@@ -498,7 +498,7 @@ class ProveedorResource extends Resource
                         ->label('Pais de Pago')
                         ->options(function (Get $get) {
                             $empresaId = $get('id_empresa');
-                            $amdgIdEmpresaCode = $get('admg_id_empresa');
+                            $amdgIdEmpresaCode = $get('amdg_id_empresa');
 
                             if (!$empresaId || !$amdgIdEmpresaCode) {
                                 return [];
@@ -548,7 +548,7 @@ class ProveedorResource extends Resource
                         ->label('Empresas para replicar')
                         ->options(function (Get $get) {
                             $lineasNegocioIds = $get('lineasNegocio');
-                            $amdgIdEmpresaCode = $get('admg_id_empresa');
+                            $amdgIdEmpresaCode = $get('amdg_id_empresa');
                             $ruc = $get('ruc');
 
                             if (empty($lineasNegocioIds)) {
@@ -603,7 +603,7 @@ class ProveedorResource extends Resource
                         ->afterStateHydrated(function (Get $get, callable $set) {
 
                             $lineasNegocioIds = $get('lineasNegocio');
-                            $amdgIdEmpresaCode = $get('admg_id_empresa');
+                            $amdgIdEmpresaCode = $get('amdg_id_empresa');
                             $ruc = $get('ruc');
 
                             if (empty($lineasNegocioIds)) {

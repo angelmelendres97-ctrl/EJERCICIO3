@@ -13,18 +13,12 @@ use App\Models\Empresa;
 use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\DB;
 use Filament\Forms\Set;
-use App\Filament\Resources\ProveedorResource;
-use App\Filament\Resources\ProductoResource;
-use App\Models\Proveedores;
-use App\Models\Producto;
-use App\Services\ProveedorSyncService;
-use App\Services\ProductoSyncService;
+use App\Filament\Resources\OrdenCompraResource\Actions\CreateProductoModalAction;
+use App\Filament\Resources\OrdenCompraResource\Actions\CreateProveedorModalAction;
 
 use Filament\Forms\Components\Placeholder;
 use Filament\Forms\Components\Section;
 use Filament\Forms\Components\Grid;
-use Filament\Forms\Components\Wizard;
-use Filament\Forms\Components\Wizard\Step;
 use Filament\Tables\Filters\Filter;
 use Filament\Forms\Get;
 use Filament\Forms\Components\Actions\Action;
@@ -309,89 +303,7 @@ class OrdenCompraResource extends Resource
                             ->live()
                             ->required()
                             ->columnSpan(2)
-                            ->suffixAction(
-                                /*
-                                |--------------------------------------------------------------------------
-                                | Modal para crear proveedor (habilitado en línea).
-                                |--------------------------------------------------------------------------
-                                */
-                                Action::make('crear_proveedor')
-                                    ->label('+')
-                                    ->tooltip('Crear proveedor')
-                                    ->icon('heroicon-o-plus')
-                                    ->modalHeading('Crear proveedor')
-                                    ->modalWidth('7xl')
-                                    ->modalSubmitActionLabel('Crear proveedor')
-                                    ->form(function (Form $form): Form {
-                                        $schema = ProveedorResource::getFormSchema();
-
-                                        return $form
-                                            ->schema([
-                                                Wizard::make([
-                                                    Step::make('Información General')
-                                                        ->schema([$schema[0]]),
-                                                    Step::make('Clasificación')
-                                                        ->schema([$schema[1]]),
-                                                    Step::make('Retención')
-                                                        ->schema([$schema[2]]),
-                                                    Step::make('Información Adicional')
-                                                        ->schema([$schema[3]]),
-                                                    Step::make('Empresas')
-                                                        ->schema([$schema[4] ?? \Filament\Forms\Components\Placeholder::make('sin_empresas')->content('No hay sección "Empresas" en el schema.')]),
-
-                                                ])
-                                            ])
-                                            ->model(Proveedores::class);
-                                    })
-                                    ->mountUsing(function (Action $action, Get $get): void {
-                                        $action->fillForm([
-                                            'id_empresa'       => $get('id_empresa'),
-                                            'admg_id_empresa'  => $get('amdg_id_empresa'),
-                                            'admg_id_sucursal' => $get('amdg_id_sucursal'),
-                                        ]);
-                                    })
-
-
-                                    ->action(function (array $data, Set $set, Get $get): void {
-
-
-
-
-                                        $record = Proveedores::create($data);
-                                        $lineasNegocioIds = $data['lineasNegocio'] ?? [];
-                                        if (!empty($lineasNegocioIds)) {
-                                            $record->lineasNegocio()->attach($lineasNegocioIds);
-                                        }
-
-                                        ProveedorSyncService::sincronizar($record, $data);
-
-                                        $empresaId = $data['id_empresa'] ?? $get('id_empresa');
-                                        $admgIdEmpresa = $data['admg_id_empresa'] ?? $get('amdg_id_empresa');
-                                        $connectionName = self::getExternalConnectionName((int) $empresaId);
-
-                                        if ($connectionName) {
-                                            $proveedor = DB::connection($connectionName)
-                                                ->table('saeclpv')
-                                                ->where('clpv_cod_empr', $admgIdEmpresa)
-                                                ->where('clpv_ruc_clpv', $data['ruc'])
-                                                ->where('clpv_clopv_clpv', 'PV')
-                                                ->select('clpv_cod_clpv', 'clpv_nom_clpv', 'clpv_ruc_clpv')
-                                                ->first();
-
-                                            if ($proveedor) {
-                                                $set('info_proveedor', $proveedor->clpv_cod_clpv);
-                                                $set('identificacion', $proveedor->clpv_ruc_clpv);
-                                                $set('id_proveedor', $proveedor->clpv_cod_clpv);
-                                                $set('proveedor', $proveedor->clpv_nom_clpv);
-                                            }
-                                        }
-
-                                        Notification::make()
-                                            ->title('Proveedor creado correctamente.')
-                                            ->success()
-                                            ->send();
-                                    })
-                            )
+                            ->suffixAction(CreateProveedorModalAction::make())
                             ->afterStateUpdated(function (Set $set, Get $get, ?string $state) {
                                 if (empty($state)) {
                                     $set('identificacion', null);
@@ -508,76 +420,7 @@ class OrdenCompraResource extends Resource
 
                 Forms\Components\Section::make('Productos')
                     ->headerActions([
-                        /*
-                        |--------------------------------------------------------------------------
-                        | Modal para registrar producto (habilitado en línea).
-                        |--------------------------------------------------------------------------
-                        */
-                        Action::make('ir_crear_producto')
-                            ->label('+ Registrar nuevo producto')
-                            ->icon('heroicon-o-plus')
-                            ->modalHeading('Registrar nuevo producto')
-                            ->modalWidth('7xl')
-                            ->modalSubmitActionLabel('Registrar producto')
-                            ->form(function (Form $form): Form {
-                                $schema = array_values(ProveedorResource::getFormSchema());
-
-                                $labels = [
-                                    'Información General',
-                                    'Clasificación',
-                                    'Retención',
-                                    'Información Adicional',
-                                    'Empresas',
-                                ];
-
-                                $steps = [];
-
-                                foreach ($labels as $i => $label) {
-                                    if (isset($schema[$i])) {
-                                        $steps[] = Step::make($label)->schema([$schema[$i]]);
-                                    }
-                                }
-
-                                // Si por alguna razón no vino nada, muestra un mensaje en el wizard
-                                if (empty($steps)) {
-                                    $steps[] = Step::make('Proveedor')
-                                        ->schema([
-                                            \Filament\Forms\Components\Placeholder::make('error_schema')
-                                                ->label('Error')
-                                                ->content('No se pudo cargar el formulario del proveedor (getFormSchema vacío).'),
-                                        ]);
-                                }
-
-                                return $form
-                                    ->schema([
-                                        Wizard::make($steps),
-                                    ])
-                                    ->model(Proveedores::class);
-                            })
-
-                            ->mountUsing(function (Action $action): void {
-                                $data = data_get($action->getLivewire(), 'data', []);
-
-                                $action->fillForm([
-                                    'id_empresa' => $data['id_empresa'] ?? null,
-                                    'amdg_id_empresa' => $data['amdg_id_empresa'] ?? null,
-                                    'amdg_id_sucursal' => $data['amdg_id_sucursal'] ?? null,
-                                ]);
-                            })
-                            ->action(function (array $data): void {
-                                $record = Producto::create($data);
-                                $lineasNegocioIds = $data['lineasNegocio'] ?? [];
-                                if (!empty($lineasNegocioIds)) {
-                                    $record->lineasNegocio()->attach($lineasNegocioIds);
-                                }
-
-                                ProductoSyncService::sincronizar($record, $data);
-
-                                Notification::make()
-                                    ->title('Producto creado correctamente.')
-                                    ->success()
-                                    ->send();
-                            }),
+                        CreateProductoModalAction::make(),
                     ])
                     ->schema([
                         Forms\Components\Repeater::make('detalles')
