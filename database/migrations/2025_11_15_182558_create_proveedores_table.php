@@ -16,8 +16,8 @@ return new class extends Migration
 
             // RELACIONES
             $table->unsignedBigInteger('id_empresa'); // FK con empresas
-            $table->integer('admg_id_empresa');
-            $table->integer('admg_id_sucursal');
+            $table->integer('amdg_id_empresa');
+            $table->integer('amdg_id_sucursal');
 
             // DATOS DEL PROVEEDOR
             $table->string('tipo');
