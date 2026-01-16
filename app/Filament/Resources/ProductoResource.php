@@ -111,6 +111,7 @@ class ProductoResource extends Resource
                             ->searchable()
                             ->preload()
                             ->live()
+                            ->reactive()
                             ->required(),
 
                         Forms\Components\Select::make('amdg_id_sucursal')
@@ -142,6 +143,7 @@ class ProductoResource extends Resource
                             ->searchable()
                             ->preload()
                             ->live()
+                            ->reactive()
                             ->required(),
                         Forms\Components\Select::make('linea')
                             ->label('Línea')
@@ -171,6 +173,7 @@ class ProductoResource extends Resource
                             })
                             ->searchable()
                             ->live()
+                            ->reactive()
                             ->required(),
                         Forms\Components\Select::make('grupo')
                             ->label('Grupo')
@@ -201,6 +204,7 @@ class ProductoResource extends Resource
                             })
                             ->searchable()
                             ->live()
+                            ->reactive()
                             ->required(),
                         Forms\Components\Select::make('categoria')
                             ->label('Categoria')
@@ -231,6 +235,7 @@ class ProductoResource extends Resource
                             })
                             ->searchable()
                             ->live()
+                            ->reactive()
                             ->required(),
                         Forms\Components\Select::make('marca')
                             ->label('Marca')
@@ -260,6 +265,7 @@ class ProductoResource extends Resource
                                 }
                             })
                             ->searchable()
+                            ->reactive()
                             ->required(),
 
                         Forms\Components\Actions::make([
