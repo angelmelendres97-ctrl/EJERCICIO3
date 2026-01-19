@@ -59,7 +59,7 @@ class ResumenPedidosController extends Controller
             ->count();
 
         if ($empresasUnicas > 1 || $sucursalesUnicas > 1) {
-            return 'Resumen de pedidos (varias empresas y sucursales)';
+            return 'Resumen de pedidos';
         }
 
         if ($resumenPedidos->tipo === 'PB') {

@@ -261,7 +261,7 @@
             </div>
 
             <div class="doc-line">
-                <span class="doc-number">O.C. N° {{ str_pad($resumen->codigo_secuencial, 8, '0', STR_PAD_LEFT) }}</span>
+                <span class="doc-number">R. N° {{ str_pad($resumen->codigo_secuencial, 8, '0', STR_PAD_LEFT) }}</span>
                 <span class="doc-type"> {{ $resumen->tipo }}</span>
             </div>
         </div>
@@ -348,21 +348,21 @@
         @endforeach
 
         <div class="row-flex" style="">
-            <div class="col-8">
+          {{--   <div class="col-8">
                 <div class="flex" style="margin-top: 8px; text-align: right !important;">
                     <div class="left-info">
                         <b>TOTAL GENERAL: $ {{ number_format($total_oc, 2) }} </b>
                         <br>
                     </div>
                 </div>
-            </div>
+            </div> --}}
 
             <div class="col-4">
                 <table>
                     <thead>
                         <tr>
                             <th style="width:80%; border: none; border-collapse: collapse;" class="left"></th>
-                            <td style="width:10%" class="right"><b>TOTAL $</b></td>
+                            <td style="width:10%" class="right"><b>TOTAL GENERAL $</b></td>
                             <td style="width:10%" class="right"><b>$ {{ number_format($total_oc, 2) }}</b></td>
                         </tr>
                     </thead>
