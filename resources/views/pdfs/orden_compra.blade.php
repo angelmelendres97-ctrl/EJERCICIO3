@@ -480,6 +480,10 @@
                             <th class="left">SUBTOTAL</th>
                             <td class="right">$ {{ $fmtMoney($subtotalGeneral) }}</td>
                         </tr>
+                        <tr>
+                            <th class="left">TOTAL DESCUENTO</th>
+                            <td class="right">$ {{ $fmtMoney($descuentoGeneral) }}</td>
+                        </tr>
 
                         {{-- TARIFA + IVA (intercalados, como factura real) --}}
                         @foreach ($basePorIva as $rate => $base)
