@@ -1,6 +1,11 @@
 <div>
     @php
-        $detalles = $record ? $record->detalles()->with('ordenCompra.empresa')->get() : collect();
+        $detalles = $record
+            ? $record->detalles()
+                ->whereHas('ordenCompra', fn($query) => $query->where('anulada', false))
+                ->with('ordenCompra.empresa')
+                ->get()
+            : collect();
     @endphp
 
     <div class="p-4">
