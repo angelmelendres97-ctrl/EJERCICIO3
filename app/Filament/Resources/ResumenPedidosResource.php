@@ -246,6 +246,7 @@ class ResumenPedidosResource extends Resource
                     ->state(function (ResumenPedidos $record): string {
                         // lo mismo que ya estás mostrando: "OC: 355, 356..."
                         $ids = $record->detalles()
+                            ->whereHas('ordenCompra', fn($query) => $query->where('anulada', false))
                             ->pluck('id_orden_compra')
                             ->filter()
                             ->unique()
