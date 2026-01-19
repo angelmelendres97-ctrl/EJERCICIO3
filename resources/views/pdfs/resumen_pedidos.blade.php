@@ -230,6 +230,19 @@
             font-size: 18px;
             font-weight: 700;
         }
+
+        .group-title {
+            margin-top: 16px;
+            font-size: 13px;
+            font-weight: 700;
+            text-transform: uppercase;
+        }
+
+        .group-subtitle {
+            font-size: 11px;
+            font-weight: 600;
+            margin-top: 2px;
+        }
     </style>
 </head>
 
@@ -248,67 +261,108 @@
             </div>
 
             <div class="doc-line">
-                <span class="doc-number">O.C. N° {{ str_pad($resumen->codigo_secuencial, 8, '0', STR_PAD_LEFT) }}</span>
+                <span class="doc-number">R. N° {{ str_pad($resumen->codigo_secuencial, 8, '0', STR_PAD_LEFT) }}</span>
                 <span class="doc-type"> {{ $resumen->tipo }}</span>
             </div>
         </div>
 
-        <table>
-            <thead>
-                <tr>
-                    <th style="width:2px">Items</th>
-                    <th style="width:8px">Fecha</th>
-                    <th style="width:35px">Proveedor</th>
-                    <th style="width:20px">Detalle</th>
-                    <th style="width:15px">Pedido</th>
-                    <th style="width:12px">N°. Factura o Proforma</th>
-                    <th style="width:12px">Orden Compra</th>
-                    <th style="width:5px">Total</th>
-                </tr>
-            </thead>
-            <tbody>
+        @php
+            $total_oc = 0;
+        @endphp
 
-                @php
-                    $total_oc = 0;
-                @endphp
+        @foreach ($groupedDetalles as $grupo)
+            <div class="group-title">
+                Conexión: {{ $grupo['conexion_nombre'] ?: $grupo['conexion_id'] }}
+            </div>
+            <div class="group-subtitle">
+                Empresa: {{ $grupo['empresa_nombre'] ?: $grupo['empresa_id'] }} | Sucursal: {{ $grupo['sucursal_nombre'] ?: $grupo['sucursal_id'] }}
+            </div>
 
-                @foreach ($detalles as $key => $detalle)
+            <table>
+                <thead>
                     <tr>
-                        <td class="center">{{ $key + 1 }}</td>
-
-                        @php
-                            $data_orden_compra = $detalle->ordenCompra;
-                            $total_oc += $data_orden_compra?->total ?? 0;
-                        @endphp
-
-                        <td>{{ $data_orden_compra?->fecha_pedido ? date_format(date_create($data_orden_compra->fecha_pedido), 'Y-m-d') : '' }}</td>
-                        <td class="left">{{ $data_orden_compra?->proveedor }}</td>
-                        <td class="left">{{ $data_orden_compra?->observaciones ? strtoupper($data_orden_compra->observaciones) : '' }}</td>
-                        <td class="left">{{ $data_orden_compra?->pedidos_importados }}</td>
-                        <td class="left">{{ $data_orden_compra?->numero_factura_proforma ?? '' }}</td>
-                        <td class="left">{{ $data_orden_compra?->id ? str_pad($data_orden_compra->id, 8, '0', STR_PAD_LEFT) : '' }}</td>
-                        <td class="right">$ {{ number_format($data_orden_compra?->total ?? 0, 2) }}</td>
+                        <th style="width:2px">Items</th>
+                        <th style="width:8px">Fecha</th>
+                        <th style="width:35px">Proveedor</th>
+                        <th style="width:20px">Detalle</th>
+                        <th style="width:15px">Pedido</th>
+                        <th style="width:12px">N°. Factura o Proforma</th>
+                        <th style="width:12px">Orden Compra</th>
+                        <th style="width:5px">Total</th>
                     </tr>
-                @endforeach
-            </tbody>
-        </table>
+                </thead>
+                <tbody>
+                    @php
+                        $total_grupo = 0;
+                    @endphp
+
+                    @foreach ($grupo['detalles'] as $key => $detalle)
+                        <tr>
+                            <td class="center">{{ $key + 1 }}</td>
+
+                            @php
+                                $data_orden_compra = $detalle->ordenCompra;
+                                $total_grupo += $data_orden_compra?->total ?? 0;
+                            @endphp
+
+                            <td>{{ $data_orden_compra?->fecha_pedido ? date_format(date_create($data_orden_compra->fecha_pedido), 'Y-m-d') : '' }}</td>
+                            <td class="left">{{ $data_orden_compra?->proveedor }}</td>
+                            <td class="left">{{ $data_orden_compra?->observaciones ? strtoupper($data_orden_compra->observaciones) : '' }}</td>
+                            <td class="left">{{ $data_orden_compra?->pedidos_importados }}</td>
+                            <td class="left">{{ $data_orden_compra?->numero_factura_proforma ?? '' }}</td>
+                            <td class="left">{{ $data_orden_compra?->id ? str_pad($data_orden_compra->id, 8, '0', STR_PAD_LEFT) : '' }}</td>
+                            <td class="right">$ {{ number_format($data_orden_compra?->total ?? 0, 2) }}</td>
+                        </tr>
+                    @endforeach
+                </tbody>
+            </table>
+
+            <div class="row-flex" style="">
+                <div class="col-8">
+                    <div class="flex" style="margin-top: 5px; text-align: right !important;">
+                        <div class="left-info">
+                            <b>TOTAL GRUPO: $ {{ number_format($total_grupo, 2) }} </b>
+                            <br>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="col-4">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th style="width:80%; border: none; border-collapse: collapse;" class="left"></th>
+                                <td style="width:10%" class="right"><b>TOTAL $</b></td>
+                                <td style="width:10%" class="right"><b>$ {{ number_format($total_grupo, 2) }}</b></td>
+                            </tr>
+                        </thead>
+                    </table>
+                </div>
+
+                <div class="clearfix"></div>
+            </div>
+
+            @php
+                $total_oc += $total_grupo;
+            @endphp
+        @endforeach
 
         <div class="row-flex" style="">
-            <div class="col-8">
-                <div class="flex" style="margin-top: 5px; text-align: right !important;">
+          {{--   <div class="col-8">
+                <div class="flex" style="margin-top: 8px; text-align: right !important;">
                     <div class="left-info">
-                        <b>TOTAL: $ {{ number_format($total_oc, 2) }} </b>
+                        <b>TOTAL GENERAL: $ {{ number_format($total_oc, 2) }} </b>
                         <br>
                     </div>
                 </div>
-            </div>
+            </div> --}}
 
             <div class="col-4">
                 <table>
                     <thead>
                         <tr>
                             <th style="width:80%; border: none; border-collapse: collapse;" class="left"></th>
-                            <td style="width:10%" class="right"><b>TOTAL $</b></td>
+                            <td style="width:10%" class="right"><b>TOTAL GENERAL $</b></td>
                             <td style="width:10%" class="right"><b>$ {{ number_format($total_oc, 2) }}</b></td>
                         </tr>
                     </thead>
