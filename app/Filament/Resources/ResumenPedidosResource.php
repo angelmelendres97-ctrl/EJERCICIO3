@@ -236,10 +236,55 @@ class ResumenPedidosResource extends Resource
             ->actionsPosition(\Filament\Tables\Enums\ActionsPosition::BeforeColumns)
             ->columns([
                 Tables\Columns\TextColumn::make('codigo_secuencial')
-                    ->label('Secuencial')
+                    ->label('N° Resumen')
                     ->formatStateUsing(fn(string $state): string => str_pad($state, 8, '0', STR_PAD_LEFT))
                     ->searchable()
+                    ->searchable(isIndividual: true)
                     ->sortable(),
+                Tables\Columns\TextColumn::make('pedidos_importados')
+                    ->label('Órdenes Importadas')
+                    ->state(function (ResumenPedidos $record): string {
+                        // lo mismo que ya estás mostrando: "OC: 355, 356..."
+                        $ids = $record->detalles()
+                            ->pluck('id_orden_compra')
+                            ->filter()
+                            ->unique()
+                            ->values();
+
+                        return $ids->isEmpty() ? '—' : 'OC: ' . $ids->join(', ');
+                    })
+                    ->wrap()
+                    ->toggleable()
+                    ->searchable(
+                        isIndividual: true,
+                        isGlobal: true,
+                        query: function (Builder $query, string $search): Builder {
+                            $search = trim($search);
+
+                            if ($search === '') {
+                                return $query;
+                            }
+
+                            // Busca por ID de OC dentro de los detalles del resumen
+                            // (Postgres: ILIKE)
+                            return $query->whereHas('detalles', function (Builder $q) use ($search) {
+                                $q->where('id_orden_compra', 'ilike', "%{$search}%");
+                            });
+                        }
+                    ),
+                Tables\Columns\TextColumn::make('total_resumen')
+                    ->label('Total')
+                    ->state(function (ResumenPedidos $record) {
+                        // Suma de las órdenes incluidas en el resumen
+                        return $record->detalles()
+                            ->with('ordenCompra:id,total')
+                            ->get()
+                            ->sum(fn($det) => (float) ($det->ordenCompra->total ?? 0));
+                    })
+                    ->money('USD', locale: 'es_EC')
+                    ->sortable(false) // importante: no es columna real
+                    ->toggleable(),
+
                 Tables\Columns\TextColumn::make('empresa.nombre_empresa')
                     ->label('Conexión')
                     ->searchable()

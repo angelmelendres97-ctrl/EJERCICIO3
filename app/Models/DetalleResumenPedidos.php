@@ -16,8 +16,9 @@ class DetalleResumenPedidos extends Model
 
     public function resumenPedido()
     {
-        return $this->belongsTo(ResumenPedidos::class, 'id_resumen_pedidos');
+        return $this->belongsTo(\App\Models\ResumenPedidos::class, 'id_resumen_pedidos');
     }
+
 
     public function ordenCompra()
     {

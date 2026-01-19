@@ -990,6 +990,7 @@ namespace App\Models {
      * @property int $amdg_id_empresa
      * @property int $id_empresa
      * @property int $id
+     * @property-read mixed $pedidos_importados
      * @property-read \App\Models\Empresa $empresa
      * @property-read \Illuminate\Database\Eloquent\Collection<int, \App\Models\DetalleResumenPedidos> $detalles
      * @property-read int|null $detalles_count
@@ -3929,10 +3930,10 @@ namespace App\Models {
      * @method static \Illuminate\Database\Eloquent\Builder<Permission>|Permission newModelQuery()
      * @method static \Illuminate\Database\Eloquent\Builder<Permission>|Permission newQuery()
      * @method static \Illuminate\Database\Eloquent\Builder<Permission>|Permission query()
-     * @method static \Illuminate\Database\Eloquent\Builder<Permission>|Permission role(mixed $roles, mixed $guard = null, mixed $without = false)
-     * @method static \Illuminate\Database\Eloquent\Builder<Permission>|Permission withoutRole(mixed $roles, mixed $guard = null)
-     * @method static \Illuminate\Database\Eloquent\Builder<Permission>|Permission permission(mixed $permissions, mixed $without = false)
-     * @method static \Illuminate\Database\Eloquent\Builder<Permission>|Permission withoutPermission(mixed $permissions)
+     * @method static \Illuminate\Database\Eloquent\Builder<Permission>|Permission role(mixed $roles, mixed $guard = null, mixed $without = false) {@see App\Models\Permission::scopeRole()}
+     * @method static \Illuminate\Database\Eloquent\Builder<Permission>|Permission withoutRole(mixed $roles, mixed $guard = null) {@see App\Models\Permission::scopeWithoutRole()}
+     * @method static \Illuminate\Database\Eloquent\Builder<Permission>|Permission permission(mixed $permissions, mixed $without = false) {@see App\Models\Permission::scopePermission()}
+     * @method static \Illuminate\Database\Eloquent\Builder<Permission>|Permission withoutPermission(mixed $permissions) {@see App\Models\Permission::scopeWithoutPermission()}
      * @method static mixed select($columns)
      * @method static mixed selectSub($query, $as)
      * @method static mixed selectRaw($expression, array $bindings)
@@ -5260,8 +5261,8 @@ namespace App\Models {
      * @method static \Illuminate\Database\Eloquent\Builder<Role>|Role newModelQuery()
      * @method static \Illuminate\Database\Eloquent\Builder<Role>|Role newQuery()
      * @method static \Illuminate\Database\Eloquent\Builder<Role>|Role query()
-     * @method static \Illuminate\Database\Eloquent\Builder<Role>|Role permission(mixed $permissions, mixed $without = false)
-     * @method static \Illuminate\Database\Eloquent\Builder<Role>|Role withoutPermission(mixed $permissions)
+     * @method static \Illuminate\Database\Eloquent\Builder<Role>|Role permission(mixed $permissions, mixed $without = false) {@see App\Models\Role::scopePermission()}
+     * @method static \Illuminate\Database\Eloquent\Builder<Role>|Role withoutPermission(mixed $permissions) {@see App\Models\Role::scopeWithoutPermission()}
      * @method static mixed select($columns)
      * @method static mixed selectSub($query, $as)
      * @method static mixed selectRaw($expression, array $bindings)
@@ -7225,10 +7226,10 @@ namespace App\Models {
      * @method static \Illuminate\Database\Eloquent\Builder<User>|User newModelQuery()
      * @method static \Illuminate\Database\Eloquent\Builder<User>|User newQuery()
      * @method static \Illuminate\Database\Eloquent\Builder<User>|User query()
-     * @method static \Illuminate\Database\Eloquent\Builder<User>|User role(mixed $roles, mixed $guard = null, mixed $without = false)
-     * @method static \Illuminate\Database\Eloquent\Builder<User>|User withoutRole(mixed $roles, mixed $guard = null)
-     * @method static \Illuminate\Database\Eloquent\Builder<User>|User permission(mixed $permissions, mixed $without = false)
-     * @method static \Illuminate\Database\Eloquent\Builder<User>|User withoutPermission(mixed $permissions)
+     * @method static \Illuminate\Database\Eloquent\Builder<User>|User role(mixed $roles, mixed $guard = null, mixed $without = false) {@see App\Models\User::scopeRole()}
+     * @method static \Illuminate\Database\Eloquent\Builder<User>|User withoutRole(mixed $roles, mixed $guard = null) {@see App\Models\User::scopeWithoutRole()}
+     * @method static \Illuminate\Database\Eloquent\Builder<User>|User permission(mixed $permissions, mixed $without = false) {@see App\Models\User::scopePermission()}
+     * @method static \Illuminate\Database\Eloquent\Builder<User>|User withoutPermission(mixed $permissions) {@see App\Models\User::scopeWithoutPermission()}
      * @method static mixed select($columns)
      * @method static mixed selectSub($query, $as)
      * @method static mixed selectRaw($expression, array $bindings)
@@ -7550,8 +7551,8 @@ namespace Spatie\Permission\Models {
      * @method static \Illuminate\Database\Eloquent\Builder<Role>|Role newModelQuery()
      * @method static \Illuminate\Database\Eloquent\Builder<Role>|Role newQuery()
      * @method static \Illuminate\Database\Eloquent\Builder<Role>|Role query()
-     * @method static \Illuminate\Database\Eloquent\Builder<Role>|Role permission(mixed $permissions, mixed $without = false)
-     * @method static \Illuminate\Database\Eloquent\Builder<Role>|Role withoutPermission(mixed $permissions)
+     * @method static \Illuminate\Database\Eloquent\Builder<Role>|Role permission(mixed $permissions, mixed $without = false) {@see Spatie\Permission\Models\Role::scopePermission()}
+     * @method static \Illuminate\Database\Eloquent\Builder<Role>|Role withoutPermission(mixed $permissions) {@see Spatie\Permission\Models\Role::scopeWithoutPermission()}
      * @method static mixed select($columns)
      * @method static mixed selectSub($query, $as)
      * @method static mixed selectRaw($expression, array $bindings)
@@ -7871,10 +7872,10 @@ namespace Spatie\Permission\Models {
      * @method static \Illuminate\Database\Eloquent\Builder<Permission>|Permission newModelQuery()
      * @method static \Illuminate\Database\Eloquent\Builder<Permission>|Permission newQuery()
      * @method static \Illuminate\Database\Eloquent\Builder<Permission>|Permission query()
-     * @method static \Illuminate\Database\Eloquent\Builder<Permission>|Permission role(mixed $roles, mixed $guard = null, mixed $without = false)
-     * @method static \Illuminate\Database\Eloquent\Builder<Permission>|Permission withoutRole(mixed $roles, mixed $guard = null)
-     * @method static \Illuminate\Database\Eloquent\Builder<Permission>|Permission permission(mixed $permissions, mixed $without = false)
-     * @method static \Illuminate\Database\Eloquent\Builder<Permission>|Permission withoutPermission(mixed $permissions)
+     * @method static \Illuminate\Database\Eloquent\Builder<Permission>|Permission role(mixed $roles, mixed $guard = null, mixed $without = false) {@see Spatie\Permission\Models\Permission::scopeRole()}
+     * @method static \Illuminate\Database\Eloquent\Builder<Permission>|Permission withoutRole(mixed $roles, mixed $guard = null) {@see Spatie\Permission\Models\Permission::scopeWithoutRole()}
+     * @method static \Illuminate\Database\Eloquent\Builder<Permission>|Permission permission(mixed $permissions, mixed $without = false) {@see Spatie\Permission\Models\Permission::scopePermission()}
+     * @method static \Illuminate\Database\Eloquent\Builder<Permission>|Permission withoutPermission(mixed $permissions) {@see Spatie\Permission\Models\Permission::scopeWithoutPermission()}
      * @method static mixed select($columns)
      * @method static mixed selectSub($query, $as)
      * @method static mixed selectRaw($expression, array $bindings)
