@@ -28,6 +28,25 @@ class CreateResumenPedidos extends CreateRecord
     protected function mutateFormDataBeforeCreate(array $data): array
     {
         $data['id_usuario'] = $data['id_usuario'] ?? auth()->id();
+        $conexiones = $this->data['conexiones'] ?? [];
+        $empresasSeleccionadas = ResumenPedidosResource::groupOptionsByConnection($this->data['empresas'] ?? []);
+        $sucursalesSeleccionadas = ResumenPedidosResource::groupOptionsByConnection($this->data['sucursales'] ?? []);
+
+        $conexionPrincipal = $conexiones[0] ?? null;
+        $empresaPrincipal = $conexionPrincipal ? ($empresasSeleccionadas[$conexionPrincipal][0] ?? null) : null;
+        $sucursalPrincipal = $conexionPrincipal ? ($sucursalesSeleccionadas[$conexionPrincipal][0] ?? null) : null;
+
+        if ($conexionPrincipal) {
+            $data['id_empresa'] = $conexionPrincipal;
+        }
+
+        if ($empresaPrincipal) {
+            $data['amdg_id_empresa'] = $empresaPrincipal;
+        }
+
+        if ($sucursalPrincipal) {
+            $data['amdg_id_sucursal'] = $sucursalPrincipal;
+        }
 
         // Calculate the next sequential number
         $nextSecuencial = (ResumenPedidos::max('codigo_secuencial') ?? 0) + 1;
@@ -38,6 +57,7 @@ class CreateResumenPedidos extends CreateRecord
         $data['tipo'] = $data['tipo_presupuesto']; // Assuming this is the case from the form
         $data['descripcion'] = 'Resumen generado el ' . now()->toDateTimeString();
 
+        unset($data['conexiones'], $data['empresas'], $data['sucursales']);
 
         return $data;
     }

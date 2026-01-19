@@ -72,51 +72,161 @@ class ResumenPedidosResource extends Resource
         return $connectionName;
     }
 
+    protected static function getEmpresasOptionsByConnections(array $conexiones): array
+    {
+        return collect($conexiones)
+            ->flatMap(function ($conexion) {
+                return collect(self::getEmpresasOptions((int) $conexion))
+                    ->mapWithKeys(fn($nombre, $codigo) => [
+                        $conexion . '|' . $codigo => $nombre,
+                    ]);
+            })
+            ->all();
+    }
+
+    protected static function getSucursalesOptionsByConnections(array $conexiones, array $empresasSeleccionadas): array
+    {
+        return collect($conexiones)
+            ->flatMap(function ($conexion) use ($empresasSeleccionadas) {
+                $empresas = $empresasSeleccionadas[$conexion] ?? [];
+
+                return collect(self::getSucursalesOptions((int) $conexion, $empresas))
+                    ->mapWithKeys(fn($nombre, $codigo) => [
+                        $conexion . '|' . $codigo => $nombre,
+                    ]);
+            })
+            ->all();
+    }
+
+    protected static function getEmpresasOptions(?int $empresaId): array
+    {
+        if (! $empresaId) {
+            return [];
+        }
+
+        $connectionName = self::getExternalConnectionName($empresaId);
+
+        if (! $connectionName) {
+            return [];
+        }
+
+        try {
+            return DB::connection($connectionName)
+                ->table('saeempr')
+                ->pluck('empr_nom_empr', 'empr_cod_empr')
+                ->all();
+        } catch (\Throwable $e) {
+            return [];
+        }
+    }
+
+    protected static function getSucursalesOptions(?int $empresaId, array $empresas): array
+    {
+        if (! $empresaId || empty($empresas)) {
+            return [];
+        }
+
+        $connectionName = self::getExternalConnectionName($empresaId);
+
+        if (! $connectionName) {
+            return [];
+        }
+
+        try {
+            return DB::connection($connectionName)
+                ->table('saesucu')
+                ->whereIn('sucu_cod_empr', $empresas)
+                ->pluck('sucu_nom_sucu', 'sucu_cod_sucu')
+                ->all();
+        } catch (\Throwable $e) {
+            return [];
+        }
+    }
+
+    public static function groupOptionsByConnection(array $optionKeys): array
+    {
+        $agrupado = [];
+
+        foreach ($optionKeys as $value) {
+            [$conexion, $codigo] = array_pad(explode('|', (string) $value, 2), 2, null);
+
+            if ($conexion && $codigo) {
+                $agrupado[(int) $conexion][] = $codigo;
+            }
+        }
+
+        return $agrupado;
+    }
+
+    protected static function buildDefaultEmpresasSelection(array $conexiones): array
+    {
+        return collect($conexiones)
+            ->flatMap(fn($conexion) => collect(self::getEmpresasOptions((int) $conexion))
+                ->keys()
+                ->map(fn($codigo) => $conexion . '|' . $codigo))
+            ->values()
+            ->all();
+    }
+
+    protected static function buildDefaultSucursalesSelection(array $conexiones, array $empresasSeleccionadas): array
+    {
+        $empresas = self::groupOptionsByConnection($empresasSeleccionadas);
+
+        return collect($conexiones)
+            ->flatMap(fn($conexion) => collect(self::getSucursalesOptions((int) $conexion, $empresas[$conexion] ?? []))
+                ->keys()
+                ->map(fn($codigo) => $conexion . '|' . $codigo))
+            ->values()
+            ->all();
+    }
+
     public static function form(Form $form): Form
     {
         return $form
             ->schema([
                 Forms\Components\Section::make('Conexión y Empresa')
                     ->schema([
-                        Forms\Components\Select::make('id_empresa')
-                            ->label('Conexion')
-                            ->relationship('empresa', 'nombre_empresa')
+                        Forms\Components\Select::make('conexiones')
+                            ->label('Conexiones')
+                            ->multiple()
+                            ->options(Empresa::query()->pluck('nombre_empresa', 'id'))
                             ->searchable()
                             ->preload()
                             ->live()
-                            ->required(),
-                        Forms\Components\Select::make('amdg_id_empresa')
-                            ->label('Empresa')
-                            ->options(function (Get $get) {
-                                $empresaId = $get('id_empresa');
-                                if (!$empresaId)
-                                    return [];
-                                $connectionName = self::getExternalConnectionName($empresaId);
-                                if (!$connectionName)
-                                    return [];
-                                try {
-                                    return DB::connection($connectionName)->table('saeempr')->pluck('empr_nom_empr', 'empr_cod_empr')->all();
-                                } catch (\Exception $e) {
-                                    return [];
-                                }
-                            })
-                            ->searchable()->live()->required(),
-                        Forms\Components\Select::make('amdg_id_sucursal')
-                            ->label('Sucursal')
-                            ->options(function (Get $get) {
-                                $empresaId = $get('id_empresa');
-                                $amdgIdEmpresaCode = $get('amdg_id_empresa');
-                                if (!$empresaId || !$amdgIdEmpresaCode)
-                                    return [];
-                                $connectionName = self::getExternalConnectionName($empresaId);
-                                if (!$connectionName)
-                                    return [];
-                                try {
-                                    return DB::connection($connectionName)->table('saesucu')->where('sucu_cod_empr', $amdgIdEmpresaCode)->pluck('sucu_nom_sucu', 'sucu_cod_sucu')->all();
-                                } catch (\Exception $e) {
-                                    return [];
-                                }
+                            ->required()
+                            ->default(fn(?ResumenPedidos $record) => $record ? [$record->id_empresa] : [])
+                            ->afterStateUpdated(function (Set $set, ?array $state): void {
+                                $empresas = self::buildDefaultEmpresasSelection($state ?? []);
+                                $sucursales = self::buildDefaultSucursalesSelection($state ?? [], $empresas);
+
+                                $set('empresas', $empresas);
+                                $set('sucursales', $sucursales);
                             }),
+                        Forms\Components\Select::make('empresas')
+                            ->label('Empresas')
+                            ->multiple()
+                            ->options(fn(Get $get): array => self::getEmpresasOptionsByConnections($get('conexiones') ?? []))
+                            ->searchable()
+                            ->preload()
+                            ->live()
+                            ->required()
+                            ->default(fn(?ResumenPedidos $record) => $record ? [$record->id_empresa . '|' . $record->amdg_id_empresa] : [])
+                            ->afterStateUpdated(function (Get $get, Set $set, ?array $state): void {
+                                $sucursales = self::buildDefaultSucursalesSelection($get('conexiones') ?? [], $state ?? []);
+                                $set('sucursales', $sucursales);
+                            }),
+                        Forms\Components\Select::make('sucursales')
+                            ->label('Sucursales')
+                            ->multiple()
+                            ->options(fn(Get $get): array => self::getSucursalesOptionsByConnections(
+                                $get('conexiones') ?? [],
+                                self::groupOptionsByConnection($get('empresas') ?? []),
+                            ))
+                            ->searchable()
+                            ->preload()
+                            ->live()
+                            ->required()
+                            ->default(fn(?ResumenPedidos $record) => $record ? [$record->id_empresa . '|' . $record->amdg_id_sucursal] : []),
 
                         Forms\Components\Select::make(name: 'tipo_presupuesto')
                             ->label('Presupuesto:')
@@ -148,6 +258,8 @@ class ResumenPedidosResource extends Resource
                             ->schema([
                                 Forms\Components\TextInput::make('id_orden_compra')->label('Secuencial')->readOnly()->columnSpan(2),
                                 Forms\Components\TextInput::make('nombre_empresa')->label('Conexion')->readOnly()->columnSpan(3),
+                                Forms\Components\TextInput::make('empresa')->label('Empresa')->readOnly()->columnSpan(3),
+                                Forms\Components\TextInput::make('sucursal')->label('Sucursal')->readOnly()->columnSpan(3),
                                 Forms\Components\TextInput::make('proveedor')->label('Preveedor')->readOnly()->columnSpan(3),
                                 Forms\Components\TextInput::make('total_fact')->label('Total')->readOnly()->prefix('$')->columnSpan(2),
                                 Forms\Components\DatePicker::make('fecha_oc')->label('Fecha OC')->readOnly()->columnSpan(2),
@@ -180,13 +292,13 @@ class ResumenPedidosResource extends Resource
                             ->label('Consultar Ordenes Compra')
                             ->icon('heroicon-o-magnifying-glass')
                             ->action(function (Get $get, Set $set) {
-                                $id_empresa = $get('id_empresa');
-                                $amdg_id_empresa = $get('amdg_id_empresa');
-                                $amdg_id_sucursal = $get('amdg_id_sucursal');
+                                $conexiones = $get('conexiones') ?? [];
+                                $empresasSeleccionadas = self::groupOptionsByConnection($get('empresas') ?? []);
+                                $sucursalesSeleccionadas = self::groupOptionsByConnection($get('sucursales') ?? []);
                                 $fecha_desde = $get('fecha_desde');
                                 $fecha_hasta = $get('fecha_hasta');
 
-                                if (!$id_empresa || !$amdg_id_empresa || !$amdg_id_sucursal) {
+                                if (empty($conexiones) || empty($empresasSeleccionadas)) {
                                     return;
                                 }
 
@@ -196,11 +308,36 @@ class ResumenPedidosResource extends Resource
                                     ->all();
 
                                 $query = \App\Models\OrdenCompra::query()
-                                    ->where('id_empresa', $id_empresa)
-                                    ->where('amdg_id_empresa', $amdg_id_empresa)
-                                    ->where('amdg_id_sucursal', $amdg_id_sucursal)
                                     ->whereNotIn('id', $ordenesExistentes)
                                     ->where('anulada', false);
+
+                                $aplicoFiltro = false;
+                                $query->where(function (Builder $query) use ($conexiones, $empresasSeleccionadas, $sucursalesSeleccionadas, &$aplicoFiltro) {
+                                    foreach ($conexiones as $conexionId) {
+                                        $empresas = $empresasSeleccionadas[$conexionId] ?? [];
+                                        if (empty($empresas)) {
+                                            continue;
+                                        }
+
+                                        $sucursales = $sucursalesSeleccionadas[$conexionId] ?? [];
+
+                                        $query->orWhere(function (Builder $subQuery) use ($conexionId, $empresas, $sucursales) {
+                                            $subQuery->where('id_empresa', $conexionId)
+                                                ->whereIn('amdg_id_empresa', $empresas);
+
+                                            if (! empty($sucursales)) {
+                                                $subQuery->whereIn('amdg_id_sucursal', $sucursales);
+                                            }
+                                        });
+
+                                        $aplicoFiltro = true;
+                                    }
+                                });
+
+                                if (! $aplicoFiltro) {
+                                    $set('ordenes_compra', []);
+                                    return;
+                                }
 
                                 if (!empty($fecha_desde) && !empty($fecha_hasta)) {
                                     $query->whereBetween('fecha_pedido', [$fecha_desde, $fecha_hasta]);
@@ -213,14 +350,57 @@ class ResumenPedidosResource extends Resource
 
                                 $ordenes = $query->get();
 
+                                $empresaNombrePorConexion = [];
+                                $sucursalNombrePorConexion = [];
 
-                                $ordenes = $query->get();
+                                $ordenes->groupBy('id_empresa')->each(function ($ordenesConexion, $conexionId) use (&$empresaNombrePorConexion, &$sucursalNombrePorConexion) {
+                                    $connectionName = self::getExternalConnectionName((int) $conexionId);
+                                    if (! $connectionName) {
+                                        return;
+                                    }
 
-                                $pedidos = $ordenes->map(function ($orden) {
+                                    $empresaCodes = $ordenesConexion->pluck('amdg_id_empresa')->filter()->unique()->values()->all();
+                                    $sucursalCodes = $ordenesConexion->pluck('amdg_id_sucursal')->filter()->unique()->values()->all();
+
+                                    if (! empty($empresaCodes)) {
+                                        try {
+                                            $empresaNombrePorConexion[$conexionId] = DB::connection($connectionName)
+                                                ->table('saeempr')
+                                                ->whereIn('empr_cod_empr', $empresaCodes)
+                                                ->pluck('empr_nom_empr', 'empr_cod_empr')
+                                                ->all();
+                                        } catch (\Exception $e) {
+                                            $empresaNombrePorConexion[$conexionId] = [];
+                                        }
+                                    }
+
+                                    if (! empty($empresaCodes) && ! empty($sucursalCodes)) {
+                                        try {
+                                            $sucursales = DB::connection($connectionName)
+                                                ->table('saesucu')
+                                                ->whereIn('sucu_cod_empr', $empresaCodes)
+                                                ->whereIn('sucu_cod_sucu', $sucursalCodes)
+                                                ->get(['sucu_cod_empr', 'sucu_cod_sucu', 'sucu_nom_sucu']);
+
+                                            foreach ($sucursales as $sucursal) {
+                                                $sucursalNombrePorConexion[$conexionId][$sucursal->sucu_cod_empr][$sucursal->sucu_cod_sucu] = $sucursal->sucu_nom_sucu;
+                                            }
+                                        } catch (\Exception $e) {
+                                            $sucursalNombrePorConexion[$conexionId] = [];
+                                        }
+                                    }
+                                });
+
+                                $pedidos = $ordenes->map(function ($orden) use ($empresaNombrePorConexion, $sucursalNombrePorConexion) {
+                                    $empresaNombre = $empresaNombrePorConexion[$orden->id_empresa][$orden->amdg_id_empresa] ?? $orden->amdg_id_empresa;
+                                    $sucursalNombre = $sucursalNombrePorConexion[$orden->id_empresa][$orden->amdg_id_empresa][$orden->amdg_id_sucursal] ?? $orden->amdg_id_sucursal;
+
                                     return [
                                         'id_orden_compra' => $orden->id,
                                         'id_conexion' => $orden->id_empresa,
                                         'nombre_empresa' => $orden->empresa->nombre_empresa ?? '',
+                                        'empresa' => $empresaNombre,
+                                        'sucursal' => $sucursalNombre,
                                         'proveedor' => $orden->proveedor,
                                         'total_fact' => $orden->total,
                                         'fecha_oc' => $orden->fecha_pedido ? $orden->fecha_pedido->format('Y-m-d') : null,
