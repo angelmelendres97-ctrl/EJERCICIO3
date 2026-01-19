@@ -135,6 +135,9 @@ class RegistrarEgreso extends Page implements HasTable
         return $motivo !== '' ? $motivo : 'Pago factura ' . ($detalle->numero_factura ?? '');
     }
 
+    
+
+
     protected function calculateMontos(
         float $debito,
         float $credito,

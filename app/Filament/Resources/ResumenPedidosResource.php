@@ -27,6 +27,7 @@ use Filament\Forms\Components\View;
 use Filament\Notifications\Notification;
 use Illuminate\Database\Eloquent\Model; // ESTA LÍNEA ES NECESARIA
 use Filament\Tables\Filters\Filter;
+use Carbon\Carbon;
 
 class ResumenPedidosResource extends Resource
 {
@@ -130,7 +131,10 @@ class ResumenPedidosResource extends Resource
                             ->schema([
                                 Forms\Components\DatePicker::make('fecha_desde')
                                     ->label('Fecha Desde')
-                                    ->default(now()->startOfDay()),
+                                    ->default(Carbon::create(2026, 1, 1)->startOfDay())
+                                    ->minDate(Carbon::create(2026, 1, 1))
+                                    ->maxDate(now())
+                                    ->required(),
                                 Forms\Components\DatePicker::make('fecha_hasta')
                                     ->label('Fecha Hasta')
                                     ->default(now()->endOfDay()),
@@ -246,6 +250,7 @@ class ResumenPedidosResource extends Resource
                     ->state(function (ResumenPedidos $record): string {
                         // lo mismo que ya estás mostrando: "OC: 355, 356..."
                         $ids = $record->detalles()
+                            ->whereHas('ordenCompra', fn($query) => $query->where('anulada', false))
                             ->pluck('id_orden_compra')
                             ->filter()
                             ->unique()

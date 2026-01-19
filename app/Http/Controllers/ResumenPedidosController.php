@@ -19,7 +19,11 @@ class ResumenPedidosController extends Controller
     public function descargarPdf(ResumenPedidos $resumenPedidos)
     {
         // Load necessary relationships to avoid N+1 problems.
-        $resumenPedidos->load('detalles', 'empresa', 'usuario');
+        $resumenPedidos->load('empresa', 'usuario');
+        $detalles = $resumenPedidos->detalles()
+            ->whereHas('ordenCompra', fn($query) => $query->where('anulada', false))
+            ->with('ordenCompra')
+            ->get();
 
         $nombreEmpresaTitulo = $resumenPedidos->empresa->nombre_empresa ?? 'Nombre de Empresa no disponible';
         if ($resumenPedidos->tipo === 'PB') {
@@ -45,6 +49,7 @@ class ResumenPedidosController extends Controller
         // The view 'pdfs.resumen_pedidos' will be created.
         $pdf = Pdf::loadView('pdfs.resumen_pedidos', [
             'resumen' => $resumenPedidos,
+            'detalles' => $detalles,
             'nombreEmpresaTitulo' => $nombreEmpresaTitulo,
         ])->setPaper('a4', 'landscape');
 

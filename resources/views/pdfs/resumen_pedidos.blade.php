@@ -272,22 +272,22 @@
                     $total_oc = 0;
                 @endphp
 
-                @foreach ($resumen->detalles as $key => $detalle)
+                @foreach ($detalles as $key => $detalle)
                     <tr>
                         <td class="center">{{ $key + 1 }}</td>
 
                         @php
-                            $data_orden_compra = \App\Models\OrdenCompra::find($detalle->id_orden_compra);
-                            $total_oc += $data_orden_compra->total;
+                            $data_orden_compra = $detalle->ordenCompra;
+                            $total_oc += $data_orden_compra?->total ?? 0;
                         @endphp
 
-                        <td>{{ date_format(date_create($data_orden_compra->fecha_pedido), 'Y-m-d') }}</td>
-                        <td class="left">{{ $data_orden_compra->proveedor }}</td>
-                        <td class="left">{{ strtoupper($data_orden_compra->observaciones) }}</td>
-                        <td class="left">{{ $data_orden_compra->pedidos_importados }}</td>
-                        <td class="left">{{ $data_orden_compra->numero_factura_proforma ?? '' }}</td>
-                        <td class="left">{{ str_pad($data_orden_compra->id, 8, '0', STR_PAD_LEFT) }}</td>
-                        <td class="right">$ {{ number_format($data_orden_compra->total, 2) }}</td>
+                        <td>{{ $data_orden_compra?->fecha_pedido ? date_format(date_create($data_orden_compra->fecha_pedido), 'Y-m-d') : '' }}</td>
+                        <td class="left">{{ $data_orden_compra?->proveedor }}</td>
+                        <td class="left">{{ $data_orden_compra?->observaciones ? strtoupper($data_orden_compra->observaciones) : '' }}</td>
+                        <td class="left">{{ $data_orden_compra?->pedidos_importados }}</td>
+                        <td class="left">{{ $data_orden_compra?->numero_factura_proforma ?? '' }}</td>
+                        <td class="left">{{ $data_orden_compra?->id ? str_pad($data_orden_compra->id, 8, '0', STR_PAD_LEFT) : '' }}</td>
+                        <td class="right">$ {{ number_format($data_orden_compra?->total ?? 0, 2) }}</td>
                     </tr>
                 @endforeach
             </tbody>
