@@ -286,7 +286,15 @@ class RegistrarEgreso extends Page implements HasTable
         $centroCosto = $data['centro_costo'] ?? null;
         $centroActividad = $data['centro_actividad'] ?? null;
 
+        $cuentaProveedor = $this->getCuentaProveedor($context, $record->proveedor_codigo);
+        $cuentaProveedorNombre = $this->getCuentaContableNombre($context, $cuentaProveedor);
+        $cuentaBanco = $tipoEgreso === 'cuenta_bancaria'
+            ? ($data['cuenta_contable'] ?? $cuentaBancaria)
+            : ($data['cuenta_contable'] ?? null);
+        $cuentaBancoNombre = $this->getCuentaContableNombre($context, $cuentaBanco);
+
         $directorio = [];
+        $facturaLines = [];
         $facturasActualizadas = $this->facturasByProvider[$providerKey] ?? [];
         $restante = $valor;
 
@@ -352,32 +360,6 @@ class RegistrarEgreso extends Page implements HasTable
                 'credito_extranjera' => $montosDirectorio['credito_extranjera'],
                 'diario_generado' => true,
             ];
-        }
-
-        $cuentaProveedor = $this->getCuentaProveedor($context, $record->proveedor_codigo);
-        $cuentaProveedorNombre = $this->getCuentaContableNombre($context, $cuentaProveedor);
-        $cuentaBanco = $data['cuenta_contable'] ?? null;
-        $cuentaBancoNombre = $this->getCuentaContableNombre($context, $cuentaBanco);
-
-        $diario = [];
-        $facturaLines = [];
-
-        foreach ($facturasActualizadas as $factura) {
-            $abonoPagado = (float) ($factura['abono_pagado'] ?? 0);
-            if ($abonoPagado <= 0) {
-                continue;
-            }
-
-            $monedaFactura = $factura['moneda'] ?? $moneda;
-            $cotizacionFactura = (float) ($factura['cotizacion'] ?? $cotizacion);
-            $montosFactura = $this->calculateMontos(
-                $abonoPagado,
-                0,
-                $monedaFactura,
-                $monedaBase,
-                $cotizacionFactura,
-                $cotizacionExterna
-            );
 
             $facturaLines[] = [
                 'tipo_linea' => 'factura',
@@ -385,11 +367,11 @@ class RegistrarEgreso extends Page implements HasTable
                 'cuenta' => $cuentaProveedor,
                 'cuenta_nombre' => $cuentaProveedorNombre,
                 'documento' => $factura['numero'] ?? $documento,
-                'cotizacion' => $cotizacionFactura,
-                'debito' => $montosFactura['debito_local'],
-                'credito' => $montosFactura['credito_local'],
-                'debito_extranjera' => $montosFactura['debito_extranjera'],
-                'credito_extranjera' => $montosFactura['credito_extranjera'],
+                'cotizacion' => $cotizacion,
+                'debito' => $montosDirectorio['debito_local'],
+                'credito' => $montosDirectorio['credito_local'],
+                'debito_extranjera' => $montosDirectorio['debito_extranjera'],
+                'credito_extranjera' => $montosDirectorio['credito_extranjera'],
                 'beneficiario' => $record->proveedor_nombre ?? null,
                 'cuenta_bancaria' => null,
                 'banco_cheque' => null,
@@ -403,11 +385,7 @@ class RegistrarEgreso extends Page implements HasTable
             ];
         }
 
-        $existingEntries = $this->diarioEntries[$providerKey] ?? [];
-        $existingPagoLines = collect($existingEntries)
-            ->filter(fn(array $entry) => ($entry['tipo_linea'] ?? '') === 'egreso')
-            ->values()
-            ->all();
+        $diario = [];
 
         $montosPago = $this->calculateMontos(0, $valor, $moneda, $monedaBase, $cotizacion, $cotizacionExterna);
         $diario[] = [
@@ -433,7 +411,8 @@ class RegistrarEgreso extends Page implements HasTable
             'directorio' => $documento,
         ];
 
-        $merged = array_merge($facturaLines, $existingPagoLines, $diario);
+        $existingEntries = $this->diarioEntries[$providerKey] ?? [];
+        $merged = array_merge($existingEntries, $facturaLines, $diario);
         $fila = 1;
         foreach ($merged as $index => $linea) {
             $linea['fila'] = $fila++;
@@ -497,6 +476,7 @@ class RegistrarEgreso extends Page implements HasTable
         $monedas = $this->getMonedasOptions($context);
         $formatos = $this->getFormatosOptions($context);
         $cuentas = $this->getCuentasBancariasOptions($context);
+        $cuentasBancoContables = $this->getCuentasBancoContablesOptions($context);
         $cuentasContables = $this->getCuentasContablesOptions($context);
         $centrosCosto = $this->getCentrosCostoOptions($context);
         $centrosActividad = $this->getCentrosActividadOptions($context);
@@ -556,6 +536,7 @@ class RegistrarEgreso extends Page implements HasTable
                             ->numeric()
                             ->minValue(0.01)
                             ->maxValue($saldoPendiente)
+                            ->default($saldoPendiente)
                             ->helperText('Disponible: $' . number_format($saldoPendiente, 2, '.', ','))
                             ->required(),
                     ])
@@ -564,16 +545,26 @@ class RegistrarEgreso extends Page implements HasTable
                     ->schema([
                         Select::make('cuenta_bancaria')
                             ->label('Cuenta bancaria')
-                            ->options($cuentas)
+                            ->options(function (Get $get) use ($cuentas, $cuentasBancoContables): array {
+                                return $get('tipo_egreso') === 'cuenta_bancaria'
+                                    ? $cuentasBancoContables
+                                    : $cuentas;
+                            })
                             ->searchable()
                             ->required()
                             ->reactive()
-                            ->afterStateUpdated(function ($state, callable $set) use ($context): void {
-                                $info = $this->getCuentaBancariaInfo($context, $state);
-                                if ($info) {
-                                    $set('numero_cheque', $info['numero_cheque']);
-                                    $set('formato_cheque', $info['formato_cheque']);
-                                    $set('cuenta_contable', $info['cuenta_contable']);
+                            ->afterStateUpdated(function ($state, callable $set, Get $get) use ($context): void {
+                                if ($get('tipo_egreso') === 'cheque') {
+                                    $info = $this->getCuentaBancariaInfo($context, $state);
+                                    if ($info) {
+                                        $set('numero_cheque', $info['numero_cheque']);
+                                        $set('formato_cheque', $info['formato_cheque']);
+                                        $set('cuenta_contable', $info['cuenta_contable']);
+                                    }
+                                }
+
+                                if ($get('tipo_egreso') === 'cuenta_bancaria') {
+                                    $set('cuenta_contable', $state);
                                 }
                             })
                             ->visible(fn(Get $get) => in_array($get('tipo_egreso'), ['cheque', 'cuenta_bancaria'], true)),
@@ -755,6 +746,41 @@ class RegistrarEgreso extends Page implements HasTable
             $options = $rows
                 ->mapWithKeys(fn($row) => [
                     $row->ctab_cod_ctab => $row->ctab_cod_cuen . ' - ' . $row->banc_nom_banc . ' - ' . $row->ctab_num_ctab,
+                ])
+                ->all();
+        } catch (\Throwable $e) {
+            $options = [];
+        }
+
+        return $this->catalogCache[$cacheKey] = $options;
+    }
+
+    protected function getCuentasBancoContablesOptions(array $context): array
+    {
+        $cacheKey = $this->getCatalogCacheKey($context, 'cuentas-banco-contables');
+
+        if (array_key_exists($cacheKey, $this->catalogCache)) {
+            return $this->catalogCache[$cacheKey];
+        }
+
+        $connection = $this->getExternalConnection($context);
+        $empresa = $context['empresa'] ?? null;
+
+        if (! $connection || ! $empresa) {
+            return $this->catalogCache[$cacheKey] = [];
+        }
+
+        try {
+            $rows = DB::connection($connection)
+                ->table('saecuen')
+                ->where('cuen_cod_empr', $empresa)
+                ->where('cuen_mov_cuen', 1)
+                ->orderBy('cuen_cod_cuen')
+                ->get(['cuen_cod_cuen', 'cuen_nom_cuen']);
+
+            $options = $rows
+                ->mapWithKeys(fn($row) => [
+                    $row->cuen_cod_cuen => $row->cuen_cod_cuen . ' - ' . $row->cuen_nom_cuen,
                 ])
                 ->all();
         } catch (\Throwable $e) {
