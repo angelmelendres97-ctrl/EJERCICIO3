@@ -68,7 +68,8 @@ class EgresoSolicitudPagoResource extends Resource
                     ->icon('heroicon-o-arrow-up-right')
                     ->color('primary')
                     ->url(fn(SolicitudPago $record) => self::getUrl('registrar', ['record' => $record]))
-                    ->openUrlInNewTab(),
+                    ->openUrlInNewTab()
+                    ->visible(fn(SolicitudPago $record) => strtoupper((string) $record->estado) === 'APROBADA'),
                 Tables\Actions\ActionGroup::make([
                     Tables\Actions\Action::make('descargarPdf')
                         ->label('Solicitud PDF')
