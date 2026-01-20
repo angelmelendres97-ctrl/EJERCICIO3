@@ -1,4 +1,5 @@
 <x-filament-panels::page>
+    <div x-data @open-egreso-pdf.window="window.open($event.detail.url, '_blank')">
 
     {{-- CSS DIRECTO --}}
     <style>
@@ -537,5 +538,6 @@
             </div>
         </x-filament::section>
 
+    </div>
     </div>
 </x-filament-panels::page>

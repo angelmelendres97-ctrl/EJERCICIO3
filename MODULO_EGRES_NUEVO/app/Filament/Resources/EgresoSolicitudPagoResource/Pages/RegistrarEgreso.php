@@ -28,7 +28,9 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Blade;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\HtmlString;
+use Barryvdh\DomPDF\Facade\Pdf;
 
 class RegistrarEgreso extends Page implements HasTable
 {
@@ -1086,15 +1088,22 @@ class RegistrarEgreso extends Page implements HasTable
                 ->icon('heroicon-o-check-circle')
                 ->color('success')
                 ->disabled(fn() => $this->totalDiferencia !== 0.0 || empty($this->diarioEntries))
+                ->visible(fn() => strtoupper((string) ($this->record->estado ?? '')) === 'APROBADA')
                 ->action(function (): void {
                     try {
-                        $this->registrarEgresoContable();
+                        $registros = $this->registrarEgresoContable();
+                        $this->markSolicitudAsGenerado();
+                        $pdfUrl = $this->generateEgresoPdf($registros);
+
+                        $this->dispatch('open-egreso-pdf', url: $pdfUrl);
 
                         Notification::make()
                             ->title('Egreso registrado')
                             ->body('El egreso quedó registrado en las tablas contables.')
                             ->success()
                             ->send();
+
+                        $this->redirect(EgresoSolicitudPagoResource::getUrl());
                     } catch (\Throwable $exception) {
                         Notification::make()
                             ->title('Error al registrar')
@@ -1151,12 +1160,13 @@ class RegistrarEgreso extends Page implements HasTable
             ->sum(fn(array $factura) => (float) ($factura['saldo_pendiente'] ?? 0));
     }
 
-    protected function registrarEgresoContable(): void
+    protected function registrarEgresoContable(): array
     {
         if (empty($this->diarioEntries)) {
             throw new \RuntimeException('No hay movimientos en el diario para registrar.');
         }
 
+        $registros = [];
         foreach ($this->diarioEntries as $providerKey => $entries) {
             $context = $this->providerContexts[$providerKey] ?? null;
 
@@ -1164,13 +1174,15 @@ class RegistrarEgreso extends Page implements HasTable
                 throw new \RuntimeException('No se encontró el contexto contable del proveedor.');
             }
 
-            $this->registrarContabilidadProveedor(
+            $registros[] = $this->registrarContabilidadProveedor(
                 $providerKey,
                 $entries,
                 $this->directorioEntries[$providerKey] ?? [],
                 $context
             );
         }
+
+        return $registros;
     }
 
     protected function registrarContabilidadProveedor(
@@ -1178,7 +1190,7 @@ class RegistrarEgreso extends Page implements HasTable
         array $entries,
         array $directorioEntries,
         array $context
-    ): void {
+    ): array {
         $connection = $this->getExternalConnection($context);
         $empresa = $context['empresa'] ?? null;
         $sucursal = $context['sucursal'] ?? null;
@@ -1187,7 +1199,7 @@ class RegistrarEgreso extends Page implements HasTable
             throw new \RuntimeException('No existe conexión o empresa/sucursal válida para el registro contable.');
         }
 
-        DB::connection($connection)->transaction(function () use (
+        return DB::connection($connection)->transaction(function () use (
             $connection,
             $empresa,
             $sucursal,
@@ -1195,7 +1207,7 @@ class RegistrarEgreso extends Page implements HasTable
             $entries,
             $directorioEntries,
             $context
-        ): void {
+        ): array {
             $fechaMovimiento = $this->record->fecha
                 ? Carbon::parse($this->record->fecha)
                 : Carbon::now();
@@ -1413,7 +1425,47 @@ class RegistrarEgreso extends Page implements HasTable
                     'asto_est_asto' => 'MY',
                     'asto_vat_asto' => $totalDebito,
                 ]);
+
+            return [
+                'provider_key' => $providerKey,
+                'asiento' => $secuAsto,
+                'empresa' => $empresa,
+                'sucursal' => $sucursal,
+                'ejercicio' => $ejercicio,
+                'periodo' => $periodo,
+                'fecha' => $fechaMovimiento->toDateString(),
+                'beneficiario' => $beneficiario,
+                'detalle' => $detalleAsto,
+                'directorio' => $directorioEntries,
+                'diario' => $entries,
+            ];
         });
+    }
+
+    protected function markSolicitudAsGenerado(): void
+    {
+        DB::table('solicitud_pagos')
+            ->where('id', $this->record->getKey())
+            ->update([
+                'estado' => 'GENERADO EGRESO',
+                'updated_at' => now(),
+            ]);
+    }
+
+    protected function generateEgresoPdf(array $registros): string
+    {
+        $solicitud = $this->record->loadMissing('empresa', 'creadoPor');
+
+        $pdf = Pdf::loadView('pdfs/egreso-solicitud-pago', [
+            'solicitud' => $solicitud,
+            'registros' => $registros,
+        ]);
+
+        $path = 'egresos/egreso-solicitud-' . $this->record->getKey() . '-' . now()->format('YmdHis') . '.pdf';
+
+        Storage::disk('public')->put($path, $pdf->output());
+
+        return Storage::disk('public')->url($path);
     }
 
     protected function incrementarSecuencia(?string $secuencia): string

@@ -55,11 +55,17 @@ class EgresoSolicitudPagoResource extends Resource
                 TextColumn::make('estado')
                     ->badge()
                     ->formatStateUsing(function (string $state): string {
-                        return strtoupper($state) === 'APROBADA'
-                            ? 'Aprobada y pendiente de egreso'
-                            : $state;
+                        $estado = strtoupper($state);
+
+                        return match ($estado) {
+                            'APROBADA' => 'Aprobada y pendiente de egreso',
+                            'GENERADO EGRESO' => 'Generado Egreso',
+                            default => $state,
+                        };
                     })
-                    ->color(fn(string $state) => strtoupper($state) === 'APROBADA' ? 'warning' : 'success')
+                    ->color(function (string $state): string {
+                        return strtoupper($state) === 'APROBADA' ? 'warning' : 'success';
+                    })
                     ->label('Estado'),
             ])
             ->actions([
@@ -67,6 +73,7 @@ class EgresoSolicitudPagoResource extends Resource
                     ->label('Registrar egreso')
                     ->icon('heroicon-o-arrow-up-right')
                     ->color('primary')
+                    ->visible(fn(SolicitudPago $record) => strtoupper((string) $record->estado) === 'APROBADA')
                     ->url(fn(SolicitudPago $record) => self::getUrl('registrar', ['record' => $record]))
                     ->openUrlInNewTab(),
                 Tables\Actions\ActionGroup::make([
