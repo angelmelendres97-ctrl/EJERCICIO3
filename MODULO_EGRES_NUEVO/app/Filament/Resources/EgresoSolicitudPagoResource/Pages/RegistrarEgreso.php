@@ -27,8 +27,10 @@ use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Blade;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\HtmlString;
+use Illuminate\Support\Str;
 
 class RegistrarEgreso extends Page implements HasTable
 {
@@ -1086,15 +1088,33 @@ class RegistrarEgreso extends Page implements HasTable
                 ->icon('heroicon-o-check-circle')
                 ->color('success')
                 ->disabled(fn() => $this->totalDiferencia !== 0.0 || empty($this->diarioEntries))
+                ->visible(fn() => strtoupper((string) $this->record->estado) === 'APROBADA')
                 ->action(function (): void {
                     try {
-                        $this->registrarEgresoContable();
+                        $reportContext = $this->registrarEgresoContable();
+                        $this->record->update(['estado' => 'GENERADO EGRESO']);
+                        $token = (string) Str::uuid();
+
+                        Cache::put(
+                            $this->buildReportCacheKey($token),
+                            [
+                                'solicitud_id' => $this->record->getKey(),
+                                'contexts' => $reportContext,
+                            ],
+                            now()->addMinutes(10)
+                        );
 
                         Notification::make()
                             ->title('Egreso registrado')
                             ->body('El egreso quedó registrado en las tablas contables.')
                             ->success()
                             ->send();
+
+                        $this->dispatchBrowserEvent('egreso-reporte', [
+                            'url' => route('egresos.solicitud-pago.reporte', ['token' => $token]),
+                        ]);
+
+                        $this->redirect(EgresoSolicitudPagoResource::getUrl());
                     } catch (\Throwable $exception) {
                         Notification::make()
                             ->title('Error al registrar')
@@ -1151,11 +1171,17 @@ class RegistrarEgreso extends Page implements HasTable
             ->sum(fn(array $factura) => (float) ($factura['saldo_pendiente'] ?? 0));
     }
 
-    protected function registrarEgresoContable(): void
+    protected function registrarEgresoContable(): array
     {
         if (empty($this->diarioEntries)) {
             throw new \RuntimeException('No hay movimientos en el diario para registrar.');
         }
+
+        if (strtoupper((string) $this->record->estado) !== 'APROBADA') {
+            throw new \RuntimeException('La solicitud ya fue procesada y no puede registrarse nuevamente.');
+        }
+
+        $reportContext = [];
 
         foreach ($this->diarioEntries as $providerKey => $entries) {
             $context = $this->providerContexts[$providerKey] ?? null;
@@ -1164,13 +1190,15 @@ class RegistrarEgreso extends Page implements HasTable
                 throw new \RuntimeException('No se encontró el contexto contable del proveedor.');
             }
 
-            $this->registrarContabilidadProveedor(
+            $reportContext[] = $this->registrarContabilidadProveedor(
                 $providerKey,
                 $entries,
                 $this->directorioEntries[$providerKey] ?? [],
                 $context
             );
         }
+
+        return $reportContext;
     }
 
     protected function registrarContabilidadProveedor(
@@ -1178,7 +1206,7 @@ class RegistrarEgreso extends Page implements HasTable
         array $entries,
         array $directorioEntries,
         array $context
-    ): void {
+    ): array {
         $connection = $this->getExternalConnection($context);
         $empresa = $context['empresa'] ?? null;
         $sucursal = $context['sucursal'] ?? null;
@@ -1187,7 +1215,7 @@ class RegistrarEgreso extends Page implements HasTable
             throw new \RuntimeException('No existe conexión o empresa/sucursal válida para el registro contable.');
         }
 
-        DB::connection($connection)->transaction(function () use (
+        return DB::connection($connection)->transaction(function () use (
             $connection,
             $empresa,
             $sucursal,
@@ -1195,7 +1223,7 @@ class RegistrarEgreso extends Page implements HasTable
             $entries,
             $directorioEntries,
             $context
-        ): void {
+        ): array {
             $fechaMovimiento = $this->record->fecha
                 ? Carbon::parse($this->record->fecha)
                 : Carbon::now();
@@ -1413,7 +1441,21 @@ class RegistrarEgreso extends Page implements HasTable
                     'asto_est_asto' => 'MY',
                     'asto_vat_asto' => $totalDebito,
                 ]);
+
+            return [
+                'connection' => $connection,
+                'empresa' => $empresa,
+                'sucursal' => $sucursal,
+                'ejercicio' => $ejercicio,
+                'periodo' => $periodo,
+                'asto_cod_asto' => $secuAsto,
+            ];
         });
+    }
+
+    protected function buildReportCacheKey(string $token): string
+    {
+        return 'egreso_report_' . $token;
     }
 
     protected function incrementarSecuencia(?string $secuencia): string

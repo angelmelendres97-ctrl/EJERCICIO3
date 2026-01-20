@@ -538,4 +538,13 @@
         </x-filament::section>
 
     </div>
+
+    <script>
+        window.addEventListener('egreso-reporte', (event) => {
+            const url = event?.detail?.url;
+            if (url) {
+                window.open(url, '_blank');
+            }
+        });
+    </script>
 </x-filament-panels::page>
