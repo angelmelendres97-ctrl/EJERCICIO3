@@ -461,16 +461,16 @@
                                                             <td class="px-3 py-2 text-right">
                                                                 {{ $money($entry['credito_extranjera'] ?? 0) }}</td>
                                                             <td class="px-3 py-2">
-                                                                {{ $entry['beneficiario'] ?? 'N/D' }}</td>
+                                                                {{ $entry['beneficiario'] ?? '' }}</td>
                                                             <td class="px-3 py-2">
-                                                                {{ $entry['cuenta_bancaria'] ?? '-' }}</td>
+                                                                {{ $entry['cuenta_bancaria_nombre'] ?? ($entry['cuenta_bancaria'] ?? '-') }}</td>
                                                             <td class="px-3 py-2">
                                                                 {{ $entry['banco_cheque'] ?? '-' }}</td>
                                                             <td class="px-3 py-2">
                                                                 {{ $vence ? \Illuminate\Support\Carbon::parse($vence)->format('Y-m-d') : 'N/D' }}
                                                             </td>
                                                             <td class="px-3 py-2">
-                                                                {{ $entry['formato_cheque'] ?? 'N/D' }}</td>
+                                                                {{ $entry['formato_cheque_nombre'] ?? ($entry['formato_cheque'] ?? 'N/D') }}</td>
                                                             <td class="px-3 py-2">
                                                                 {{ $entry['codigo_contable'] ?? 'N/D' }}</td>
                                                             <td class="px-3 py-2 text-slate-500">
