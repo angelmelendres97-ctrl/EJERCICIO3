@@ -404,11 +404,12 @@
                                                                 str_contains($nombre, 'BANCO') ||
                                                                 str_contains($nombre, 'CHEQUE');
 
-                                                            $isBancoCheque = $porCuenta || $porNombre;
+                                                            $isBancoCheque = ($entry['es_banco'] ?? false) || $porCuenta || $porNombre;
                                                         @endphp
 
                                                         <tr class="{{ $isBancoCheque ? 'row-bank' : '' }}">
                                                             <td class="px-3 py-2 font-semibold text-slate-700">
+                                                                {{ $entry['fila'] ?? '—' }}
 
                                                                 @if ($isBancoCheque)
                                                                     <span class="badge-bank">BANCO/CHEQUE</span>
