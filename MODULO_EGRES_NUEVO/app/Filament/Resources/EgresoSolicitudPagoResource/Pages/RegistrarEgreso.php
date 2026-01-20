@@ -211,6 +211,14 @@ class RegistrarEgreso extends Page implements HasTable
                     ->label('Total a pagar')
                     ->formatStateUsing(fn($state) => '$' . number_format((float) $state, 2, '.', ','))
                     ->alignRight(),
+                TextColumn::make('saldo_pendiente_actual')
+                    ->label('Saldo pendiente actual')
+                    ->state(function (SolicitudPagoDetalle $record): float {
+                        $key = $this->buildProviderKeyFromValues($record->proveedor_codigo, $record->proveedor_ruc);
+                        return $this->getProviderSaldoPendiente($key);
+                    })
+                    ->formatStateUsing(fn($state) => '$' . number_format((float) $state, 2, '.', ','))
+                    ->alignRight(),
                 ViewColumn::make('facturas')
                     ->label('Facturas')
                     ->state(function (SolicitudPagoDetalle $record): array {
@@ -352,34 +360,59 @@ class RegistrarEgreso extends Page implements HasTable
         $cuentaBancoNombre = $this->getCuentaContableNombre($context, $cuentaBanco);
 
         $diario = [];
-        $fila = 1;
-        $montosFactura = $this->calculateMontos($valor, 0, $moneda, $monedaBase, $cotizacion, $cotizacionExterna);
+        $facturaLines = [];
+
+        foreach ($facturasActualizadas as $factura) {
+            $abonoPagado = (float) ($factura['abono_pagado'] ?? 0);
+            if ($abonoPagado <= 0) {
+                continue;
+            }
+
+            $monedaFactura = $factura['moneda'] ?? $moneda;
+            $cotizacionFactura = (float) ($factura['cotizacion'] ?? $cotizacion);
+            $montosFactura = $this->calculateMontos(
+                $abonoPagado,
+                0,
+                $monedaFactura,
+                $monedaBase,
+                $cotizacionFactura,
+                $cotizacionExterna
+            );
+
+            $facturaLines[] = [
+                'tipo_linea' => 'factura',
+                'factura' => $factura['numero'] ?? null,
+                'cuenta' => $cuentaProveedor,
+                'cuenta_nombre' => $cuentaProveedorNombre,
+                'documento' => $factura['numero'] ?? $documento,
+                'cotizacion' => $cotizacionFactura,
+                'debito' => $montosFactura['debito_local'],
+                'credito' => $montosFactura['credito_local'],
+                'debito_extranjera' => $montosFactura['debito_extranjera'],
+                'credito_extranjera' => $montosFactura['credito_extranjera'],
+                'beneficiario' => $record->proveedor_nombre ?? null,
+                'cuenta_bancaria' => null,
+                'banco_cheque' => null,
+                'fecha_vencimiento' => $factura['fecha_vencimiento'] ?? null,
+                'formato_cheque' => null,
+                'codigo_contable' => $cuentaProveedor,
+                'detalle' => $factura['detalle'] ?? $detalle,
+                'centro_costo' => $centroCosto,
+                'centro_actividad' => $centroActividad,
+                'directorio' => $factura['numero'] ?? $documento,
+            ];
+        }
+
+        $existingEntries = $this->diarioEntries[$providerKey] ?? [];
+        $existingPagoLines = collect($existingEntries)
+            ->filter(fn(array $entry) => ($entry['tipo_linea'] ?? '') === 'egreso')
+            ->values()
+            ->all();
+
         $montosPago = $this->calculateMontos(0, $valor, $moneda, $monedaBase, $cotizacion, $cotizacionExterna);
-
         $diario[] = [
-            'fila' => $fila++,
-            'cuenta' => $cuentaProveedor,
-            'cuenta_nombre' => $cuentaProveedorNombre,
-            'documento' => $documento,
-            'cotizacion' => $cotizacion,
-            'debito' => $montosFactura['debito_local'],
-            'credito' => $montosFactura['credito_local'],
-            'debito_extranjera' => $montosFactura['debito_extranjera'],
-            'credito_extranjera' => $montosFactura['credito_extranjera'],
-            'beneficiario' => $record->proveedor_nombre ?? null,
-            'cuenta_bancaria' => $cuentaBancaria,
-            'banco_cheque' => $tipoEgreso === 'cheque' ? ($data['numero_cheque'] ?? null) : $documento,
-            'fecha_vencimiento' => null,
-            'formato_cheque' => $data['formato_cheque'] ?? null,
-            'codigo_contable' => $cuentaProveedor,
-            'detalle' => $detalle,
-            'centro_costo' => $centroCosto,
-            'centro_actividad' => $centroActividad,
-            'directorio' => $documento,
-        ];
-
-        $diario[] = [
-            'fila' => $fila++,
+            'tipo_linea' => 'egreso',
+            'es_banco' => true,
             'cuenta' => $cuentaBanco,
             'cuenta_nombre' => $cuentaBancoNombre,
             'documento' => $documento,
@@ -400,8 +433,15 @@ class RegistrarEgreso extends Page implements HasTable
             'directorio' => $documento,
         ];
 
+        $merged = array_merge($facturaLines, $existingPagoLines, $diario);
+        $fila = 1;
+        foreach ($merged as $index => $linea) {
+            $linea['fila'] = $fila++;
+            $merged[$index] = $linea;
+        }
+
         $this->directorioEntries[$providerKey] = array_merge($this->directorioEntries[$providerKey] ?? [], $directorio);
-        $this->diarioEntries[$providerKey] = array_merge($this->diarioEntries[$providerKey] ?? [], $diario);
+        $this->diarioEntries[$providerKey] = $merged;
         $this->paymentMappings[$providerKey][] = [
             'tipo_egreso' => $tipoEgreso,
             'moneda' => $moneda,
@@ -702,7 +742,7 @@ class RegistrarEgreso extends Page implements HasTable
                         ->on('banc_cod_banc', '=', 'ctab_cod_banc');
                 })
                 ->where('ctab_cod_empr', $empresa)
-                ->where('ctab_tip_ctab', 'C')
+                ->whereIn('ctab_tip_ctab', ['C', 'B'])
                 ->select([
                     'ctab_cod_ctab',
                     'ctab_cod_cuen',
