@@ -1283,7 +1283,7 @@ class RegistrarEgreso extends Page implements HasTable
                     'asto_cot_asto' => 1,
                     'asto_for_impr' => 8,
                     'asto_cod_tidu' => $tidu,
-                    'asto_usu_asto' => $userName,
+                    'asto_usu_asto' => 1,
                     'asto_fec_serv' => DB::raw('CURRENT_DATE'),
                     'asto_user_web' => $userId,
                     'asto_fec_fina' => $fechaMovimiento->toDateString(),
@@ -1305,7 +1305,7 @@ class RegistrarEgreso extends Page implements HasTable
                         'asto_num_prdo' => $periodo,
                         'dir_cod_cli' => $this->resolveProveedorCodigo($providerKey),
                         'tran_cod_modu' => 4,
-                        'dir_cod_tran' => $entry['tipo'] ?? null,
+                        'dir_cod_tran' => 'CAN',
                         'dir_num_fact' => $entry['factura'] ?? null,
                         'dir_fec_venc' => $fechaVence ? Carbon::parse($fechaVence)->toDateString() : null,
                         'dir_detalle' => $entry['detalle'] ?? null,
@@ -1320,11 +1320,11 @@ class RegistrarEgreso extends Page implements HasTable
                         'dir_fac_inic' => '',
                         'dir_fac_fina' => '',
                         'dir_ser_docu' => '',
-                        'dir_fec_vali' => '',
+                        'dir_fec_vali' => null,
                         'dire_suc_clpv' => $sucursal,
                         'dir_user_web' => $userId,
                         'dire_nom_clpv' => $entry['proveedor'] ?? $beneficiario,
-                        'dir_cod_ccli' => '',
+                        'dir_cod_ccli' => null,
                     ]);
             }
 
@@ -1337,7 +1337,7 @@ class RegistrarEgreso extends Page implements HasTable
                 $esCheque = ($entry['tipo_pago'] ?? null) === 'cheque';
                 $numCheque = $entry['banco_cheque'] ?? ($entry['documento'] ?? '');
                 $opBacn = $ctaBancaria ? 'S' : 'N';
-                $opFlch = $ctaBancaria ? 1 : '';
+                $opFlch = $ctaBancaria ? 1 : null; //verificar q se oase
 
                 DB::connection($connection)
                     ->table('saedasi')
@@ -1359,9 +1359,9 @@ class RegistrarEgreso extends Page implements HasTable
                         'dasi_cod_clie' => $this->resolveProveedorCodigo($providerKey),
                         'dasi_cod_tran' => '',
                         'dasi_user_web' => $userId,
-                        'dasi_cod_ret' => '',
-                        'dasi_cod_dir' => '',
-                        'dasi_cta_ret' => '',
+                        'dasi_cod_ret' => null,
+                        'dasi_cod_dir' => null,
+                        'dasi_cta_ret' => null,
                         'dasi_cru_dasi' => 'AC',
                         'dasi_ban_dasi' => 'S',
                         'dasi_bca_dasi' => $opBacn,
