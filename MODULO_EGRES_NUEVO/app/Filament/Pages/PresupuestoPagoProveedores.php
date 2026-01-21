@@ -358,7 +358,7 @@ class PresupuestoPagoProveedores extends Page implements HasForms
             ->when(! empty($sucursales), fn($q) => $q->whereIn('erp_sucursal', $sucursales))
             ->whereHas('solicitudPago', function ($q) {
                 $q->whereNull('estado')
-                    ->orWhereIn('estado', ['BORRADOR', 'PENDIENTE']);
+                    ->orWhere('estado', '<>', 'ANULADA');
             })
             ->get([
                 'erp_clave',
@@ -718,6 +718,18 @@ class PresupuestoPagoProveedores extends Page implements HasForms
                         ->maxLength(255),
                 ])
                 ->action(fn(array $data) => $this->exportPdf($data['descripcion_reporte'] ?? '')),
+            Action::make('exportDetailedPdf')
+                ->label('Exportar PDF Detallado')
+                ->icon('heroicon-o-document-magnifying-glass')
+                ->color('danger')
+                ->form([
+                    Forms\Components\TextInput::make('descripcion_reporte')
+                        ->label('Descripción del reporte')
+                        ->placeholder('Presupuesto del 15 de enero al 18 de mayo')
+                        ->required()
+                        ->maxLength(255),
+                ])
+                ->action(fn(array $data) => $this->exportDetailedPdf($data['descripcion_reporte'] ?? '')),
             Action::make('exportExcel')
                 ->label('Exportar Excel')
                 ->icon('heroicon-o-table-cells')
@@ -730,6 +742,18 @@ class PresupuestoPagoProveedores extends Page implements HasForms
                         ->maxLength(255),
                 ])
                 ->action(fn(array $data) => $this->exportExcel($data['descripcion_reporte'] ?? '')),
+            Action::make('exportDetailedExcel')
+                ->label('Exportar Excel Detallado')
+                ->icon('heroicon-o-table-cells')
+                ->color('success')
+                ->form([
+                    Forms\Components\TextInput::make('descripcion_reporte')
+                        ->label('Descripción del reporte')
+                        ->placeholder('Presupuesto del 15 de enero al 18 de mayo')
+                        ->required()
+                        ->maxLength(255),
+                ])
+                ->action(fn(array $data) => $this->exportDetailedExcel($data['descripcion_reporte'] ?? '')),
         ];
     }
 
@@ -1029,31 +1053,7 @@ class PresupuestoPagoProveedores extends Page implements HasForms
             return null;
         }
 
-        $rows = [];
-
-        foreach ($selected as $proveedor) {
-            foreach ($proveedor['empresas'] ?? [] as $empresa) {
-                foreach ($empresa['sucursales'] ?? [] as $sucursal) {
-                    foreach ($sucursal['facturas'] ?? [] as $factura) {
-                        $rows[] = [
-                            'Conexion' => $factura['conexion_nombre'] ?? '',
-                            'Empresa' => $empresa['empresa_nombre'] ?? $empresa['empresa_codigo'],
-                            'Sucursal' => $sucursal['sucursal_nombre'] ?? $sucursal['sucursal_codigo'],
-                            'Proveedor' => $proveedor['proveedor_nombre'] ?? $proveedor['proveedor_codigo'],
-                            'RUC' => $proveedor['proveedor_ruc'] ?? '',
-                            'Descripcion' => $proveedor['descripcion'] ?? '',
-                            'Area' => $proveedor['area'] ?? $this->formatAreaSelection($this->computeAreaForProveedor($proveedor)),
-                            'Factura' => $factura['numero'] ?? '',
-                            'Fecha Emision' => $factura['fecha_emision'] ?? '',
-                            'Fecha Vencimiento' => $factura['fecha_vencimiento'] ?? '',
-                            'Saldo Factura' => number_format((float) ($factura['saldo'] ?? 0), 2, '.', ''),
-                            'Total Proveedor' => number_format((float) ($proveedor['total'] ?? 0), 2, '.', ''),
-                            'Conexion Empresa' => $empresa['conexion_nombre'] ?? '',
-                        ];
-                    }
-                }
-            }
-        }
+        $rows = $this->buildDetailedExcelRows($selected);
 
         return response()->streamDownload(function () use ($rows, $descripcionReporte) {
             $handle = fopen('php://output', 'wb');
@@ -1087,5 +1087,100 @@ class PresupuestoPagoProveedores extends Page implements HasForms
         }, 'presupuesto-pago-proveedores.csv', [
             'Content-Type' => 'text/csv',
         ]);
+    }
+
+    protected function exportDetailedPdf(string $descripcionReporte)
+    {
+        $selected = $this->ensureSelection();
+
+        if ($selected === null) {
+            return null;
+        }
+
+        $empresas = $this->groupByEmpresaForReport($selected);
+
+        return response()->streamDownload(function () use ($descripcionReporte, $empresas) {
+            echo Pdf::loadView('pdfs.presupuesto-pago-proveedores-detallado', [
+                'empresas' => $empresas,
+                'total' => $this->totalSeleccionado,
+                'descripcionReporte' => $descripcionReporte,
+                'usuario' => Auth::user()?->name,
+            ])->setPaper('a4', 'landscape')->stream();
+        }, 'presupuesto-pago-proveedores-detallado.pdf');
+    }
+
+    protected function exportDetailedExcel(string $descripcionReporte)
+    {
+        $selected = $this->ensureSelection();
+
+        if ($selected === null) {
+            return null;
+        }
+
+        $rows = $this->buildDetailedExcelRows($selected);
+
+        return response()->streamDownload(function () use ($rows, $descripcionReporte) {
+            $handle = fopen('php://output', 'wb');
+
+            if (! empty($descripcionReporte)) {
+                fputcsv($handle, [$descripcionReporte]);
+                fputcsv($handle, []);
+            }
+
+            fputcsv($handle, array_keys($rows[0] ?? [
+                'Conexion' => 'Conexion',
+                'Empresa' => 'Empresa',
+                'Sucursal' => 'Sucursal',
+                'Proveedor' => 'Proveedor',
+                'RUC' => 'RUC',
+                'Descripcion' => 'Descripcion',
+                'Area' => 'Area',
+                'Factura' => 'Factura',
+                'Fecha Emision' => 'Fecha Emision',
+                'Fecha Vencimiento' => 'Fecha Vencimiento',
+                'Saldo Factura' => 'Saldo Factura',
+                'Total Proveedor' => 'Total Proveedor',
+                'Conexion Empresa' => 'Conexion Empresa',
+            ]));
+
+            foreach ($rows as $row) {
+                fputcsv($handle, $row);
+            }
+
+            fclose($handle);
+        }, 'presupuesto-pago-proveedores-detallado.csv', [
+            'Content-Type' => 'text/csv',
+        ]);
+    }
+
+    protected function buildDetailedExcelRows(array $selected): array
+    {
+        $rows = [];
+
+        foreach ($selected as $proveedor) {
+            foreach ($proveedor['empresas'] ?? [] as $empresa) {
+                foreach ($empresa['sucursales'] ?? [] as $sucursal) {
+                    foreach ($sucursal['facturas'] ?? [] as $factura) {
+                        $rows[] = [
+                            'Conexion' => $factura['conexion_nombre'] ?? '',
+                            'Empresa' => $empresa['empresa_nombre'] ?? $empresa['empresa_codigo'],
+                            'Sucursal' => $sucursal['sucursal_nombre'] ?? $sucursal['sucursal_codigo'],
+                            'Proveedor' => $proveedor['proveedor_nombre'] ?? $proveedor['proveedor_codigo'],
+                            'RUC' => $proveedor['proveedor_ruc'] ?? '',
+                            'Descripcion' => $proveedor['descripcion'] ?? '',
+                            'Area' => $proveedor['area'] ?? $this->formatAreaSelection($this->computeAreaForProveedor($proveedor)),
+                            'Factura' => $factura['numero'] ?? '',
+                            'Fecha Emision' => $factura['fecha_emision'] ?? '',
+                            'Fecha Vencimiento' => $factura['fecha_vencimiento'] ?? '',
+                            'Saldo Factura' => number_format((float) ($factura['saldo'] ?? 0), 2, '.', ''),
+                            'Total Proveedor' => number_format((float) ($proveedor['total'] ?? 0), 2, '.', ''),
+                            'Conexion Empresa' => $empresa['conexion_nombre'] ?? '',
+                        ];
+                    }
+                }
+            }
+        }
+
+        return $rows;
     }
 }

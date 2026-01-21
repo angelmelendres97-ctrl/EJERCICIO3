@@ -23,10 +23,17 @@ class EgresoSolicitudPagoResource extends Resource
 
     protected static ?string $pluralModelLabel = 'Solicitudes aprobadas';
 
+    public static function userIsAdmin(): bool
+    {
+        $user = auth()->user();
+
+        return $user?->hasRole('ADMINISTRADOR') ?? false;
+    }
+
     public static function getEloquentQuery(): Builder
     {
         return parent::getEloquentQuery()
-            ->whereRaw('upper(estado) = ?', ['APROBADA']);
+            ->whereRaw('upper(estado) in (?, ?)', ['APROBADA', 'ANULADA']);
     }
 
     public static function table(Table $table): Table
@@ -55,11 +62,17 @@ class EgresoSolicitudPagoResource extends Resource
                 TextColumn::make('estado')
                     ->badge()
                     ->formatStateUsing(function (string $state): string {
-                        return strtoupper($state) === 'APROBADA'
-                            ? 'Aprobada y pendiente de egreso'
-                            : $state;
+                        return match (strtoupper($state)) {
+                            'APROBADA' => 'Aprobada y pendiente de egreso',
+                            'ANULADA' => 'Anulada',
+                            default => $state,
+                        };
                     })
-                    ->color(fn(string $state) => strtoupper($state) === 'APROBADA' ? 'warning' : 'success')
+                    ->color(fn(string $state) => match (strtoupper($state)) {
+                        'APROBADA' => 'warning',
+                        'ANULADA' => 'danger',
+                        default => 'success',
+                    })
                     ->label('Estado'),
             ])
             ->actions([
@@ -76,6 +89,11 @@ class EgresoSolicitudPagoResource extends Resource
                         ->icon('heroicon-o-document-arrow-down')
                         ->color('danger')
                         ->action(fn(SolicitudPago $record) => app(SolicitudPagoReportService::class)->exportPdf($record)),
+                    Tables\Actions\Action::make('descargarPdfDetallado')
+                        ->label('Solicitud PDF Detallado')
+                        ->icon('heroicon-o-document-magnifying-glass')
+                        ->color('danger')
+                        ->action(fn(SolicitudPago $record) => app(SolicitudPagoReportService::class)->exportDetailedPdf($record)),
                     Tables\Actions\Action::make('descargarExcel')
                         ->label('Solicitud EXCEL')
                         ->icon('heroicon-o-table-cells')
@@ -86,6 +104,20 @@ class EgresoSolicitudPagoResource extends Resource
                     ->icon('heroicon-o-arrow-down-tray')
                     ->color('gray')
                     ->button(),
+                Tables\Actions\Action::make('anularSolicitud')
+                    ->label('Anular')
+                    ->icon('heroicon-o-x-circle')
+                    ->color('danger')
+                    ->requiresConfirmation()
+                    ->visible(fn(SolicitudPago $record) => strtoupper((string) $record->estado) === 'APROBADA')
+                    ->action(fn(SolicitudPago $record) => $record->update(['estado' => 'ANULADA'])),
+                Tables\Actions\Action::make('eliminarSolicitud')
+                    ->label('Eliminar')
+                    ->icon('heroicon-o-trash')
+                    ->color('danger')
+                    ->requiresConfirmation()
+                    ->visible(fn(SolicitudPago $record) => strtoupper((string) $record->estado) === 'ANULADA' && self::userIsAdmin())
+                    ->action(fn(SolicitudPago $record) => $record->delete()),
             ])
             ->bulkActions([]);
     }

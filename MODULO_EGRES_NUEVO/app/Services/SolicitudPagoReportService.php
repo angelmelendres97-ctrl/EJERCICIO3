@@ -85,6 +85,90 @@ class SolicitudPagoReportService
         }, $this->buildExcelFilename($solicitud));
     }
 
+    public function exportDetailedPdf(SolicitudPago $solicitud): StreamedResponse
+    {
+        $solicitud->loadMissing('detalles');
+
+        $facturas = $this->buildFacturaRowsFromSolicitud($solicitud);
+        [$facturasNormales, $compras] = $this->splitFacturas($facturas);
+
+        $proveedores = $this->getProvidersWithMetadata($facturasNormales);
+        $empresas = $this->buildEmpresasParaReportes($proveedores);
+        $totales = $this->buildTotalesDesdeFacturas(array_merge($facturasNormales, $compras));
+        $comprasReport = $this->buildComprasReportRows($compras);
+        $descripcion = $this->buildDescripcionReporte($solicitud);
+
+        return response()->streamDownload(function () use ($empresas, $totales, $descripcion, $comprasReport) {
+            echo Pdf::loadView('pdfs.solicitud-pago-facturas-detallado', [
+                'empresas' => $empresas,
+                'totales' => $totales,
+                'usuario' => Auth::user()?->name,
+                'descripcionReporte' => $descripcion,
+                'compras' => $comprasReport,
+            ])->setPaper('a4', 'landscape')->stream();
+        }, $this->buildDetailedPdfFilename($solicitud));
+    }
+
+    public function exportDetailedExcel(SolicitudPago $solicitud): StreamedResponse
+    {
+        $solicitud->loadMissing('detalles');
+
+        $facturas = $this->buildFacturaRowsFromSolicitud($solicitud);
+        $proveedores = $this->getProvidersWithMetadata($facturas);
+        $empresas = $this->buildEmpresasParaReportes($proveedores);
+
+        $rows = collect($empresas)
+            ->flatMap(function (array $empresa) {
+                return collect($empresa['proveedores'] ?? [])->flatMap(function (array $proveedor) use ($empresa) {
+                    return collect($proveedor['sucursales'] ?? [])->flatMap(function (array $sucursal) use ($empresa, $proveedor) {
+                        return collect($sucursal['facturas'] ?? [])->map(function (array $factura) use ($empresa, $proveedor, $sucursal) {
+                            return [
+                                'Conexion' => $empresa['conexion_nombre'] ?? '',
+                                'Empresa' => $empresa['empresa_nombre'] ?? $empresa['empresa_codigo'],
+                                'Sucursal' => $sucursal['sucursal_nombre'] ?? $sucursal['sucursal_codigo'],
+                                'Proveedor' => $proveedor['nombre'] ?? '',
+                                'RUC' => $proveedor['ruc'] ?? '',
+                                'Descripcion' => $proveedor['descripcion'] ?? '',
+                                'Factura' => $factura['numero'] ?? '',
+                                'Fecha Emision' => $factura['fecha_emision'] ?? '',
+                                'Fecha Vencimiento' => $factura['fecha_vencimiento'] ?? '',
+                                'Valor' => number_format((float) ($factura['valor'] ?? 0), 2, '.', ''),
+                                'Abono' => number_format((float) ($factura['abono'] ?? 0), 2, '.', ''),
+                                'Saldo pendiente' => number_format((float) ($factura['saldo'] ?? 0), 2, '.', ''),
+                            ];
+                        });
+                    });
+                });
+            })
+            ->values()
+            ->all();
+
+        return response()->streamDownload(function () use ($rows) {
+            $handle = fopen('php://output', 'wb');
+
+            fputcsv($handle, array_keys($rows[0] ?? [
+                'Conexion' => 'Conexion',
+                'Empresa' => 'Empresa',
+                'Sucursal' => 'Sucursal',
+                'Proveedor' => 'Proveedor',
+                'RUC' => 'RUC',
+                'Descripcion' => 'Descripcion',
+                'Factura' => 'Factura',
+                'Fecha Emision' => 'Fecha Emision',
+                'Fecha Vencimiento' => 'Fecha Vencimiento',
+                'Valor' => 'Valor',
+                'Abono' => 'Abono',
+                'Saldo pendiente' => 'Saldo pendiente',
+            ]));
+
+            foreach ($rows as $row) {
+                fputcsv($handle, $row);
+            }
+
+            fclose($handle);
+        }, $this->buildDetailedExcelFilename($solicitud));
+    }
+
     protected function buildFacturaRowsFromSolicitud(SolicitudPago $solicitud): array
     {
         $registros = [];
@@ -450,5 +534,15 @@ class SolicitudPagoReportService
     protected function buildExcelFilename(SolicitudPago $solicitud): string
     {
         return 'solicitud-pago-' . $solicitud->getKey() . '.csv';
+    }
+
+    protected function buildDetailedPdfFilename(SolicitudPago $solicitud): string
+    {
+        return 'solicitud-pago-detallado-' . $solicitud->getKey() . '.pdf';
+    }
+
+    protected function buildDetailedExcelFilename(SolicitudPago $solicitud): string
+    {
+        return 'solicitud-pago-detallado-' . $solicitud->getKey() . '.csv';
     }
 }
