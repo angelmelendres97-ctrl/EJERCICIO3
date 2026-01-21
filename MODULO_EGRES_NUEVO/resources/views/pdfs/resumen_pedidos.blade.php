@@ -250,9 +250,19 @@
     <div class="page">
 
         <div class="header-date">
-            <div class="title-main">Machala,
-                {{ mb_convert_case(new IntlDateFormatter('es_ES', IntlDateFormatter::NONE, IntlDateFormatter::NONE, 'America/Guayaquil', IntlDateFormatter::GREGORIAN, "d 'de' MMMM 'del' yyyy")->format(new DateTime(date('Y-m-d'))), MB_CASE_TITLE, 'UTF-8') }}
-            </div>
+          @php
+    // 1) Toma la fecha real del documento (created_at o la que uses como "fecha_documento")
+    // 2) La conviertes a America/Guayaquil
+    // 3) La formateas en español
+
+    $fechaDoc = optional($resumen->created_at)
+        ->timezone('America/Guayaquil')
+        ->locale('es')
+        ->translatedFormat("d \\d\\e F \\d\\e\\l Y");
+@endphp
+
+<div class="title-main">Machala, {{ mb_convert_case($fechaDoc ?? '', MB_CASE_TITLE, 'UTF-8') }}</div>
+
         </div>
 
         <div class="header-block">
@@ -275,7 +285,8 @@
                 Conexión: {{ $grupo['conexion_nombre'] ?: $grupo['conexion_id'] }}
             </div>
             <div class="group-subtitle">
-                Empresa: {{ $grupo['empresa_nombre'] ?: $grupo['empresa_id'] }} | Sucursal: {{ $grupo['sucursal_nombre'] ?: $grupo['sucursal_id'] }}
+                Empresa: {{ $grupo['empresa_nombre'] ?: $grupo['empresa_id'] }} | Sucursal:
+                {{ $grupo['sucursal_nombre'] ?: $grupo['sucursal_id'] }}
             </div>
 
             <table>
@@ -305,12 +316,17 @@
                                 $total_grupo += $data_orden_compra?->total ?? 0;
                             @endphp
 
-                            <td>{{ $data_orden_compra?->fecha_pedido ? date_format(date_create($data_orden_compra->fecha_pedido), 'Y-m-d') : '' }}</td>
+                            <td>{{ $data_orden_compra?->fecha_pedido ? date_format(date_create($data_orden_compra->fecha_pedido), 'Y-m-d') : '' }}
+                            </td>
                             <td class="left">{{ $data_orden_compra?->proveedor }}</td>
-                            <td class="left">{{ $data_orden_compra?->observaciones ? strtoupper($data_orden_compra->observaciones) : '' }}</td>
+                            <td class="left">
+                                {{ $data_orden_compra?->observaciones ? strtoupper($data_orden_compra->observaciones) : '' }}
+                            </td>
                             <td class="left">{{ $data_orden_compra?->pedidos_importados }}</td>
                             <td class="left">{{ $data_orden_compra?->numero_factura_proforma ?? '' }}</td>
-                            <td class="left">{{ $data_orden_compra?->id ? str_pad($data_orden_compra->id, 8, '0', STR_PAD_LEFT) : '' }}</td>
+                            <td class="left">
+                                {{ $data_orden_compra?->id ? str_pad($data_orden_compra->id, 8, '0', STR_PAD_LEFT) : '' }}
+                            </td>
                             <td class="right">$ {{ number_format($data_orden_compra?->total ?? 0, 2) }}</td>
                         </tr>
                     @endforeach
@@ -348,7 +364,7 @@
         @endforeach
 
         <div class="row-flex" style="">
-          {{--   <div class="col-8">
+            {{--   <div class="col-8">
                 <div class="flex" style="margin-top: 8px; text-align: right !important;">
                     <div class="left-info">
                         <b>TOTAL GENERAL: $ {{ number_format($total_oc, 2) }} </b>
@@ -412,7 +428,7 @@
 
     </div>
 
-    
+
 
 </body>
 

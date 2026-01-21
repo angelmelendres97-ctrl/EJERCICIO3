@@ -1332,13 +1332,25 @@ class SolicitudPagoResource extends Resource
                         ->color('danger')
                         ->visible(fn(SolicitudPago $record) => in_array(strtoupper($record->estado ?? ''), ['APROBADA', 'BORRADOR', 'PENDIENTE'], true))
                         ->action(fn(SolicitudPago $record) => app(SolicitudPagoReportService::class)->exportPdf($record)),
+                    Tables\Actions\Action::make('descargarPdfDetallado')
+                        ->label('Solicitud PDF Detallado')
+                        ->icon('heroicon-o-document-magnifying-glass')
+                        ->color('danger')
+                        ->visible(fn(SolicitudPago $record) => in_array(strtoupper($record->estado ?? ''), ['APROBADA', 'BORRADOR', 'PENDIENTE'], true))
+                        ->action(fn(SolicitudPago $record) => app(SolicitudPagoReportService::class)->exportDetailedPdf($record)),
 
-                    Tables\Actions\Action::make('descargarExcel')
+                   /*  Tables\Actions\Action::make('descargarExcel')
                         ->label('Solicitud EXCEL')
                         ->icon('heroicon-o-table-cells')
                         ->color('success')
                         ->visible(fn(SolicitudPago $record) => in_array(strtoupper($record->estado ?? ''), ['APROBADA', 'BORRADOR', 'PENDIENTE'], true))
                         ->action(fn(SolicitudPago $record) => app(SolicitudPagoReportService::class)->exportExcel($record)),
+                    Tables\Actions\Action::make('descargarExcelDetallado')
+                        ->label('Solicitud EXCEL Detallado')
+                        ->icon('heroicon-o-table-cells')
+                        ->color('success')
+                        ->visible(fn(SolicitudPago $record) => in_array(strtoupper($record->estado ?? ''), ['APROBADA', 'BORRADOR', 'PENDIENTE'], true))
+                        ->action(fn(SolicitudPago $record) => app(SolicitudPagoReportService::class)->exportDetailedExcel($record)), */
 
                     Tables\Actions\Action::make('gestionar')
                         ->label('Asignar abonos facturas')

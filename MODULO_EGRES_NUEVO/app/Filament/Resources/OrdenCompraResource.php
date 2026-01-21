@@ -133,31 +133,8 @@ class OrdenCompraResource extends Resource
         return $form
             ->schema([
 
-                /*
-                |--------------------------------------------------------------------------
-                | MODAL "Ver Productos de la Orden" (DESACTIVADO TEMPORALMENTE)
-                | Motivo: en tu entorno está fallando por métodos no disponibles.
-                |--------------------------------------------------------------------------
-                */
-                // Actions::make([
-                //     Action::make('verProductos')
-                //         ->label('Ver Productos de la Orden')
-                //         ->action(function (OrdenCompra $record) {
-                //             // No action needed here, it just opens the modal
-                //         })
-                //         ->modalContent(fn(OrdenCompra $record): \Illuminate\Contracts\View\View => view(
-                //             'filament.resources.orden-compra-resource.actions.ver-productos',
-                //             ['detalles' => $record->detalles],
-                //         ))
-                //         ->modalSubmitAction(false)
-                //         ->modalCancelAction(fn(StaticAction $action) => $action->label('Cerrar'))
-                //         ->color('info')
-                //         ->icon('heroicon-o-eye'),
-                // ])
-                //     ->columnSpanFull()
-                //     ->visible(fn($record) => $record !== null),
-
                 Forms\Components\Section::make('Conexión y Empresa')
+
                     ->schema([
                         Forms\Components\Select::make('id_empresa')
                             ->label('Conexión')
@@ -771,7 +748,9 @@ class OrdenCompraResource extends Resource
                             ->viewData(fn(Get $get) => self::buildResumenTotales($get('detalles') ?? [])),
                     ])->columns(1),
 
-            ])->live();
+            ])->live()->extraAttributes([
+                'onkeydown' => "if (event.key === 'Enter') { event.preventDefault(); return false; }"
+            ]);
     }
 
     public static function table(Table $table): Table
