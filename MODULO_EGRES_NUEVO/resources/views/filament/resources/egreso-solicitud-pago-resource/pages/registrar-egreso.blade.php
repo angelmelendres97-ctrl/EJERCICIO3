@@ -414,24 +414,49 @@
                                                             @php
                                                                 $tipoPago = null;
 
-                                                                // Prioridad 1: si viene definido explícitamente
+                                                                // 1) Si viene explícito desde backend
                                                                 if (!empty($entry['tipo_pago'])) {
-                                                                    $tipoPago = strtoupper($entry['tipo_pago']); // CHEQUE | CUENTA BANCO
+                                                                    $tipoPago = strtoupper(
+                                                                        trim((string) $entry['tipo_pago']),
+                                                                    ); // CHEQUE | CUENTA BANCO | BANCO
                                                                 }
-
-                                                                // Prioridad 2: heurística por datos existentes
+                                                                // 2) Si viene banco_cheque (muchas veces aquí guardan "BANCO" / "CHEQUE")
+                                                                elseif (
+                                                                    !empty($entry['banco_cheque']) &&
+                                                                    $entry['banco_cheque'] !== '-'
+                                                                ) {
+                                                                    $bc = strtoupper(
+                                                                        trim((string) $entry['banco_cheque']),
+                                                                    );
+                                                                    $tipoPago =
+                                                                        $bc === 'BANCO'
+                                                                            ? 'CUENTA BANCO'
+                                                                            : ($bc === 'CHEQUE'
+                                                                                ? 'CHEQUE'
+                                                                                : $bc);
+                                                                }
+                                                                // 3) Si hay formato cheque => CHEQUE
                                                                 elseif (
                                                                     !empty($entry['formato_cheque']) &&
                                                                     $entry['formato_cheque'] !== 'N/D'
                                                                 ) {
                                                                     $tipoPago = 'CHEQUE';
-                                                                } elseif (
-                                                                    !empty($entry['cuenta_bancaria']) &&
-                                                                    $entry['cuenta_bancaria'] !== 'N/D'
-                                                                ) {
-                                                                    $tipoPago = 'CUENTA BANCO';
+                                                                }
+                                                                // 4) Si hay cuenta bancaria (ID o nombre) => CUENTA BANCO
+                                                                else {
+                                                                    $cbId = $entry['cuenta_bancaria'] ?? null;
+                                                                    $cbNom = $entry['cuenta_bancaria_nombre'] ?? null;
+
+                                                                    $tieneCuentaBancaria =
+                                                                        (is_numeric($cbId) && (string) $cbId !== '') ||
+                                                                        (!empty($cbNom) && $cbNom !== '-');
+
+                                                                    if ($tieneCuentaBancaria) {
+                                                                        $tipoPago = 'CUENTA BANCO';
+                                                                    }
                                                                 }
                                                             @endphp
+
 
                                                             <td class="px-3 py-2 font-semibold text-slate-700">
                                                                 {{ $entry['fila'] ?? '—' }}
@@ -461,16 +486,18 @@
                                                             <td class="px-3 py-2 text-right">
                                                                 {{ $money($entry['credito_extranjera'] ?? 0) }}</td>
                                                             <td class="px-3 py-2">
-                                                                {{ $entry['beneficiario'] ?? 'N/D' }}</td>
+                                                                {{ $entry['beneficiario'] ?? '' }}</td>
                                                             <td class="px-3 py-2">
-                                                                {{ $entry['cuenta_bancaria'] ?? '-' }}</td>
+                                                                {{ $entry['cuenta_bancaria_nombre'] ?? ($entry['cuenta_bancaria'] ?? '-') }}
+                                                            </td>
                                                             <td class="px-3 py-2">
                                                                 {{ $entry['banco_cheque'] ?? '-' }}</td>
                                                             <td class="px-3 py-2">
                                                                 {{ $vence ? \Illuminate\Support\Carbon::parse($vence)->format('Y-m-d') : 'N/D' }}
                                                             </td>
                                                             <td class="px-3 py-2">
-                                                                {{ $entry['formato_cheque'] ?? 'N/D' }}</td>
+                                                                {{ $entry['formato_cheque_nombre'] ?? ($entry['formato_cheque'] ?? 'N/D') }}
+                                                            </td>
                                                             <td class="px-3 py-2">
                                                                 {{ $entry['codigo_contable'] ?? 'N/D' }}</td>
                                                             <td class="px-3 py-2 text-slate-500">

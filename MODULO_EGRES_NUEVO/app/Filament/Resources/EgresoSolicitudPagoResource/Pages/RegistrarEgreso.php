@@ -259,6 +259,9 @@ class RegistrarEgreso extends Page implements HasTable
         $monedaBase = $this->getMonedaBase($context);
         $tipoEgreso = $data['tipo_egreso'] ?? 'cheque';
         $valor = (float) ($data['valor'] ?? 0);
+        $formatos = $this->getFormatosOptions($context);
+        $cuentasBancarias = $this->getCuentasBancariasOptions($context);
+        $cuentasBancoContables = $this->getCuentasBancoContablesOptions($context);
 
         $facturas = collect($this->facturasByProvider[$providerKey] ?? [])
             ->filter(fn(array $factura) => (float) ($factura['saldo_pendiente'] ?? 0) > 0)
@@ -292,6 +295,15 @@ class RegistrarEgreso extends Page implements HasTable
             ? ($data['cuenta_contable'] ?? $cuentaBancaria)
             : ($data['cuenta_contable'] ?? null);
         $cuentaBancoNombre = $this->getCuentaContableNombre($context, $cuentaBanco);
+        $cuentaBancariaNombre = $tipoEgreso === 'cuenta_bancaria'
+            ? ($cuentasBancoContables[$cuentaBancaria] ?? null)
+            : ($cuentasBancarias[$cuentaBancaria] ?? null);
+        $formatoCheque = $data['formato_cheque'] ?? null;
+        $formatoChequeNombre = $formatoCheque ? ($formatos[$formatoCheque] ?? null) : null;
+        $cuentaBancariaInfo = $tipoEgreso === 'cheque' && $cuentaBancaria
+            ? $this->getCuentaBancariaInfo($context, $cuentaBancaria)
+            : null;
+        $cuentaBancariaNumero = $cuentaBancariaInfo['numero_cuenta'] ?? null;
 
         $directorio = [];
         $facturaLines = [];
@@ -374,9 +386,11 @@ class RegistrarEgreso extends Page implements HasTable
                 'credito_extranjera' => $montosDirectorio['credito_extranjera'],
                 'beneficiario' => $record->proveedor_nombre ?? null,
                 'cuenta_bancaria' => null,
+                'cuenta_bancaria_nombre' => null,
                 'banco_cheque' => null,
                 'fecha_vencimiento' => $factura['fecha_vencimiento'] ?? null,
                 'formato_cheque' => null,
+                'formato_cheque_nombre' => null,
                 'codigo_contable' => $cuentaProveedor,
                 'detalle' => $factura['detalle'] ?? $detalle,
                 'centro_costo' => $centroCosto,
@@ -399,16 +413,21 @@ class RegistrarEgreso extends Page implements HasTable
             'credito' => $montosPago['credito_local'],
             'debito_extranjera' => $montosPago['debito_extranjera'],
             'credito_extranjera' => $montosPago['credito_extranjera'],
-            'beneficiario' => $record->proveedor_nombre ?? null,
+            'beneficiario' => null,
             'cuenta_bancaria' => $cuentaBancaria,
+            'cuenta_bancaria_nombre' => $cuentaBancariaNombre,
+            'cuenta_bancaria_numero' => $cuentaBancariaNumero,
             'banco_cheque' => $tipoEgreso === 'cheque' ? ($data['numero_cheque'] ?? null) : $documento,
             'fecha_vencimiento' => null,
-            'formato_cheque' => $data['formato_cheque'] ?? null,
+            'formato_cheque' => $formatoCheque,
+            'formato_cheque_nombre' => $formatoChequeNombre,
             'codigo_contable' => $cuentaBanco,
             'detalle' => $tipoEgreso === 'cheque' ? ('Pago bancario ' . ($cuentaBancaria ?? '')) : $detalle,
             'centro_costo' => $centroCosto,
             'centro_actividad' => $centroActividad,
             'directorio' => $documento,
+            'tipo_pago' => $tipoEgreso,
+            'fecha_cheque' => $data['fecha_cheque'] ?? null,
         ];
 
         $existingEntries = $this->diarioEntries[$providerKey] ?? [];
@@ -907,7 +926,7 @@ class RegistrarEgreso extends Page implements HasTable
                 ->table('saectab')
                 ->where('ctab_cod_empr', $empresa)
                 ->where('ctab_cod_ctab', $cta)
-                ->select(['ctab_num_cheq', 'ctab_for_cheq', 'ctab_cod_cuen'])
+                ->select(['ctab_num_cheq', 'ctab_for_cheq', 'ctab_cod_cuen', 'ctab_num_ctab'])
                 ->first();
 
             if (! $row) {
@@ -918,6 +937,7 @@ class RegistrarEgreso extends Page implements HasTable
                 'numero_cheque' => (string) $row->ctab_num_cheq,
                 'formato_cheque' => $row->ctab_for_cheq,
                 'cuenta_contable' => $row->ctab_cod_cuen,
+                'numero_cuenta' => $row->ctab_num_ctab,
             ];
         } catch (\Throwable $e) {
             return $this->catalogCache[$cacheKey] = null;
@@ -1067,11 +1087,21 @@ class RegistrarEgreso extends Page implements HasTable
                 ->color('success')
                 ->disabled(fn() => $this->totalDiferencia !== 0.0 || empty($this->diarioEntries))
                 ->action(function (): void {
-                    Notification::make()
-                        ->title('Egreso registrado')
-                        ->body('El egreso quedó listo para su registro contable.')
-                        ->success()
-                        ->send();
+                    try {
+                        $this->registrarEgresoContable();
+
+                        Notification::make()
+                            ->title('Egreso registrado')
+                            ->body('El egreso quedó registrado en las tablas contables.')
+                            ->success()
+                            ->send();
+                    } catch (\Throwable $exception) {
+                        Notification::make()
+                            ->title('Error al registrar')
+                            ->body($exception->getMessage())
+                            ->danger()
+                            ->send();
+                    }
                 }),
         ];
     }
@@ -1119,5 +1149,315 @@ class RegistrarEgreso extends Page implements HasTable
     {
         return collect($this->facturasByProvider[$providerKey] ?? [])
             ->sum(fn(array $factura) => (float) ($factura['saldo_pendiente'] ?? 0));
+    }
+
+    protected function registrarEgresoContable(): void
+    {
+        if (empty($this->diarioEntries)) {
+            throw new \RuntimeException('No hay movimientos en el diario para registrar.');
+        }
+
+        foreach ($this->diarioEntries as $providerKey => $entries) {
+            $context = $this->providerContexts[$providerKey] ?? null;
+
+            if (! $context) {
+                throw new \RuntimeException('No se encontró el contexto contable del proveedor.');
+            }
+
+            $this->registrarContabilidadProveedor(
+                $providerKey,
+                $entries,
+                $this->directorioEntries[$providerKey] ?? [],
+                $context
+            );
+        }
+    }
+
+    protected function registrarContabilidadProveedor(
+        string $providerKey,
+        array $entries,
+        array $directorioEntries,
+        array $context
+    ): void {
+        $connection = $this->getExternalConnection($context);
+        $empresa = $context['empresa'] ?? null;
+        $sucursal = $context['sucursal'] ?? null;
+
+        if (! $connection || ! $empresa || ! $sucursal) {
+            throw new \RuntimeException('No existe conexión o empresa/sucursal válida para el registro contable.');
+        }
+
+        DB::connection($connection)->transaction(function () use (
+            $connection,
+            $empresa,
+            $sucursal,
+            $providerKey,
+            $entries,
+            $directorioEntries,
+            $context
+        ): void {
+            $fechaMovimiento = $this->record->fecha
+                ? Carbon::parse($this->record->fecha)
+                : Carbon::now();
+
+            $moneda = $this->getMonedaBase($context);
+            $tidu = DB::connection($connection)
+                ->table('saetidu')
+                ->where('tidu_cod_empr', $empresa)
+                ->where('tidu_cod_modu', 5)
+                ->where('tidu_tip_tidu', 'EG')
+                ->orderBy('tidu_cod_tidu')
+                ->value('tidu_cod_tidu');
+
+            if (! $tidu) {
+                throw new \RuntimeException('No se encontró el tipo de documento EG para la empresa.');
+            }
+
+            $ejercicio = DB::connection($connection)
+                ->table('saeejer')
+                ->where('ejer_cod_empr', $empresa)
+                ->whereDate('ejer_fec_finl', $fechaMovimiento->copy()->endOfYear()->toDateString())
+                ->value('ejer_cod_ejer');
+
+            if (! $ejercicio) {
+                throw new \RuntimeException('No se encontró el ejercicio contable para la fecha indicada.');
+            }
+
+            $periodo = (int) $fechaMovimiento->format('m');
+
+            $secuencia = DB::connection($connection)
+                ->table('saesecu')
+                ->where('secu_cod_empr', $empresa)
+                ->where('secu_cod_sucu', $sucursal)
+                ->where('secu_cod_tidu', $tidu)
+                ->where('secu_cod_modu', 5)
+                ->where('secu_cod_ejer', $ejercicio)
+                ->where('secu_num_prdo', $periodo)
+                ->first();
+
+            if (! $secuencia) {
+                throw new \RuntimeException('No se encontró la secuencia contable para el período.');
+            }
+
+            $secuDia = $this->incrementarSecuencia($secuencia->secu_egr_comp ?? '');
+            $secuAsto = $this->incrementarSecuencia($secuencia->secu_asi_comp ?? '');
+
+            DB::connection($connection)
+                ->table('saesecu')
+                ->where('secu_cod_empr', $empresa)
+                ->where('secu_cod_sucu', $sucursal)
+                ->where('secu_cod_tidu', $tidu)
+                ->where('secu_cod_modu', 5)
+                ->where('secu_cod_ejer', $ejercicio)
+                ->where('secu_num_prdo', $periodo)
+                ->update([
+                    'secu_egr_comp' => $secuDia,
+                    'secu_asi_comp' => $secuAsto,
+                ]);
+
+            $userId = auth()->id() ?? 0;
+            $userName = auth()->user()?->name ?? 'Sistema';
+            $beneficiario = $this->resolveBeneficiarioProveedor($providerKey, $entries);
+            $detalleAsto = $this->resolveDetalleAsto($providerKey);
+
+            DB::connection($connection)
+                ->table('saeasto')
+                ->insert([
+                    'asto_cod_asto' => $secuAsto,
+                    'asto_cod_empr' => $empresa,
+                    'asto_cod_sucu' => $sucursal,
+                    'asto_cod_ejer' => $ejercicio,
+                    'asto_num_prdo' => $periodo,
+                    'asto_cod_mone' => $moneda,
+                    'asto_cod_usua' => $userId,
+                    'asto_cod_modu' => 5,
+                    'asto_cod_tdoc' => '',
+                    'asto_ben_asto' => $beneficiario,
+                    'asto_vat_asto' => 0,
+                    'asto_fec_asto' => $fechaMovimiento->toDateString(),
+                    'asto_det_asto' => $detalleAsto,
+                    'asto_est_asto' => 'PE',
+                    'asto_num_mayo' => $secuAsto,
+                    'asto_fec_emis' => $fechaMovimiento->toDateString(),
+                    'asto_tipo_mov' => 'EG',
+                    'asto_cot_asto' => 1,
+                    'asto_for_impr' => 8,
+                    'asto_cod_tidu' => $tidu,
+                    'asto_usu_asto' => 1,
+                    'asto_fec_serv' => DB::raw('CURRENT_DATE'),
+                    'asto_user_web' => $userId,
+                    'asto_fec_fina' => $fechaMovimiento->toDateString(),
+                ]);
+
+            $dirCodigo = 0;
+            foreach ($directorioEntries as $entry) {
+                $dirCodigo++;
+                $fechaVence = $entry['fecha_vencimiento'] ?? null;
+
+                DB::connection($connection)
+                    ->table('saedir')
+                    ->insert([
+                        'dir_cod_dir' => $dirCodigo,
+                        'dire_cod_asto' => $secuAsto,
+                        'dire_cod_empr' => $empresa,
+                        'dire_cod_sucu' => $sucursal,
+                        'asto_cod_ejer' => $ejercicio,
+                        'asto_num_prdo' => $periodo,
+                        'dir_cod_cli' => $this->resolveProveedorCodigo($providerKey),
+                        'tran_cod_modu' => 4,
+                        'dir_cod_tran' => 'CAN',
+                        'dir_num_fact' => $entry['factura'] ?? null,
+                        'dir_fec_venc' => $fechaVence ? Carbon::parse($fechaVence)->toDateString() : null,
+                        'dir_detalle' => $entry['detalle'] ?? null,
+                        'dire_tip_camb' => (float) ($entry['cotizacion'] ?? 1),
+                        'dir_deb_ml' => (float) ($entry['debito_local'] ?? 0),
+                        'dir_cre_ml' => (float) ($entry['credito_local'] ?? 0),
+                        'dir_deb_mex' => (float) ($entry['debito_extranjera'] ?? 0),
+                        'dir_cred_mex' => (float) ($entry['credito_extranjera'] ?? 0),
+                        'bandera_cr' => 'DB',
+                        'dir_aut_usua' => '',
+                        'dir_aut_impr' => '',
+                        'dir_fac_inic' => '',
+                        'dir_fac_fina' => '',
+                        'dir_ser_docu' => '',
+                        'dir_fec_vali' => null,
+                        'dire_suc_clpv' => $sucursal,
+                        'dir_user_web' => $userId,
+                        'dire_nom_clpv' => $entry['proveedor'] ?? $beneficiario,
+                        'dir_cod_ccli' => null,
+                    ]);
+            }
+
+            $totalDebito = 0.0;
+            $dasiCodigo = 0;
+            foreach ($entries as $entry) {
+                $dasiCodigo++;
+                $totalDebito += (float) ($entry['debito'] ?? 0);
+                $ctaBancaria = $entry['cuenta_bancaria'] ?? null;
+                $esCheque = ($entry['tipo_pago'] ?? null) === 'cheque';
+                $numCheque = $entry['banco_cheque'] ?? ($entry['documento'] ?? '');
+                $opBacn = $ctaBancaria ? 'S' : 'N';
+                $opFlch = $ctaBancaria ? 1 : null; //verificar q se oase
+
+                DB::connection($connection)
+                    ->table('saedasi')
+                    ->insert([
+                        'asto_cod_asto' => $secuAsto,
+                        'asto_cod_empr' => $empresa,
+                        'asto_cod_sucu' => $sucursal,
+                        'dasi_num_prdo' => $periodo,
+                        'asto_cod_ejer' => $ejercicio,
+                        'dasi_cod_cuen' => $entry['cuenta'] ?? null,
+                        'ccos_cod_ccos' => $entry['centro_costo'] ?? '',
+                        'dasi_dml_dasi' => (float) ($entry['debito'] ?? 0),
+                        'dasi_cml_dasi' => (float) ($entry['credito'] ?? 0),
+                        'dasi_dme_dasi' => (float) ($entry['debito_extranjera'] ?? 0),
+                        'dasi_cme_dasi' => (float) ($entry['credito_extranjera'] ?? 0),
+                        'dasi_tip_camb' => (float) ($entry['cotizacion'] ?? 1),
+                        'dasi_det_asi' => $entry['detalle'] ?? null,
+                        'dasi_nom_ctac' => $entry['cuenta_nombre'] ?? ($entry['nombre'] ?? null),
+                        'dasi_cod_clie' => $this->resolveProveedorCodigo($providerKey),
+                        'dasi_cod_tran' => '',
+                        'dasi_user_web' => $userId,
+                        'dasi_cod_ret' => null,
+                        'dasi_cod_dir' => null,
+                        'dasi_cta_ret' => null,
+                        'dasi_cru_dasi' => 'AC',
+                        'dasi_ban_dasi' => 'S',
+                        'dasi_bca_dasi' => $opBacn,
+                        'dasi_con_flch' => $opFlch,
+                        'dasi_num_depo' => $numCheque,
+                        'dasi_cod_cact' => $entry['centro_actividad'] ?? null,
+                    ]);
+
+                if ($esCheque && $ctaBancaria) {
+                    $ctaNumero = $entry['cuenta_bancaria_numero'] ?? $ctaBancaria;
+                    $fechaCheque = $entry['fecha_cheque'] ?? null;
+
+                    DB::connection($connection)
+                        ->table('saedchc')
+                        ->insert([
+                            'dchc_cod_ctab' => $ctaBancaria,
+                            'dchc_cod_asto' => $secuAsto,
+                            'asto_cod_empr' => $empresa,
+                            'asto_cod_sucu' => $sucursal,
+                            'asto_cod_ejer' => $ejercicio,
+                            'asto_num_prdo' => $periodo,
+                            'dchc_num_dchc' => $numCheque,
+                            'dchc_val_dchc' => (float) ($entry['credito'] ?? 0),
+                            'dchc_cta_dchc' => $ctaNumero,
+                            'dchc_fec_dchc' => $fechaCheque ? Carbon::parse($fechaCheque)->toDateString() : null,
+                            'dchc_benf_dchc' => $entry['beneficiario'] ?? '',
+                            'dchc_cod_cuen' => $entry['cuenta'] ?? null,
+                            'dchc_nom_banc' => $entry['cuenta_nombre'] ?? '',
+                            'dchc_con_fila' => $dasiCodigo,
+                        ]);
+
+                    DB::connection($connection)
+                        ->table('saectab')
+                        ->where('ctab_cod_empr', $empresa)
+                        ->where('ctab_cod_sucu', $sucursal)
+                        ->where('ctab_cod_ctab', $ctaBancaria)
+                        ->update(['ctab_num_cheq' => $numCheque]);
+                }
+            }
+
+            DB::connection($connection)
+                ->table('saeasto')
+                ->where('asto_cod_empr', $empresa)
+                ->where('asto_cod_sucu', $sucursal)
+                ->where('asto_cod_asto', $secuAsto)
+                ->where('asto_cod_ejer', $ejercicio)
+                ->where('asto_num_prdo', $periodo)
+                ->update([
+                    'asto_est_asto' => 'MY',
+                    'asto_vat_asto' => $totalDebito,
+                ]);
+        });
+    }
+
+    protected function incrementarSecuencia(?string $secuencia): string
+    {
+        $secuencia = (string) $secuencia;
+        $prefijo = substr($secuencia, 0, 5);
+        $numero = (int) substr($secuencia, 5);
+        $numero++;
+
+        return $prefijo . str_pad((string) $numero, 8, '0', STR_PAD_LEFT);
+    }
+
+    protected function resolveProveedorCodigo(string $providerKey): ?string
+    {
+        return explode('|', $providerKey)[0] ?? null;
+    }
+
+    protected function resolveBeneficiarioProveedor(string $providerKey, array $entries): string
+    {
+        $beneficiario = collect($entries)
+            ->pluck('beneficiario')
+            ->filter()
+            ->first();
+
+        if ($beneficiario) {
+            return (string) $beneficiario;
+        }
+
+        return (string) ($this->resolveProveedorCodigo($providerKey) ?? '');
+    }
+
+    protected function resolveDetalleAsto(string $providerKey): string
+    {
+        $detalle = collect($this->paymentMappings[$providerKey] ?? [])
+            ->pluck('detalle')
+            ->filter()
+            ->first();
+
+        if ($detalle) {
+            return (string) $detalle;
+        }
+
+        return $this->record->motivo
+            ? (string) $this->record->motivo
+            : 'Egreso solicitud #' . $this->record->getKey();
     }
 }
