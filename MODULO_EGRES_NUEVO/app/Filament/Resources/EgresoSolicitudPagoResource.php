@@ -26,7 +26,7 @@ class EgresoSolicitudPagoResource extends Resource
     public static function getEloquentQuery(): Builder
     {
         return parent::getEloquentQuery()
-            ->whereRaw('upper(estado) = ?', ['APROBADA']);
+            ->whereRaw('upper(estado) in (?, ?)', ['APROBADA', 'ANULADA']);
     }
 
     public static function table(Table $table): Table
@@ -59,7 +59,15 @@ class EgresoSolicitudPagoResource extends Resource
                             ? 'Aprobada y pendiente de egreso'
                             : $state;
                     })
-                    ->color(fn(string $state) => strtoupper($state) === 'APROBADA' ? 'warning' : 'success')
+                    ->color(function (string $state) {
+                        $estado = strtoupper($state);
+
+                        return match ($estado) {
+                            'APROBADA' => 'warning',
+                            'ANULADA' => 'danger',
+                            default => 'success',
+                        };
+                    })
                     ->label('Estado'),
             ])
             ->actions([
@@ -70,17 +78,46 @@ class EgresoSolicitudPagoResource extends Resource
                     ->url(fn(SolicitudPago $record) => self::getUrl('registrar', ['record' => $record]))
                     ->openUrlInNewTab()
                     ->visible(fn(SolicitudPago $record) => strtoupper((string) $record->estado) === 'APROBADA'),
+                Tables\Actions\Action::make('anular')
+                    ->label('Anular')
+                    ->icon('heroicon-o-x-circle')
+                    ->color('danger')
+                    ->requiresConfirmation()
+                    ->visible(fn(SolicitudPago $record) => strtoupper((string) $record->estado) === 'APROBADA')
+                    ->action(fn(SolicitudPago $record) => $record->update(['estado' => 'ANULADA'])),
+                Tables\Actions\Action::make('eliminar')
+                    ->label('Eliminar')
+                    ->icon('heroicon-o-trash')
+                    ->color('danger')
+                    ->requiresConfirmation()
+                    ->visible(function (SolicitudPago $record): bool {
+                        $user = auth()->user();
+
+                        return strtoupper((string) $record->estado) === 'ANULADA'
+                            && ($user?->hasRole('ADMINISTRADOR') ?? false);
+                    })
+                    ->action(fn(SolicitudPago $record) => $record->delete()),
                 Tables\Actions\ActionGroup::make([
                     Tables\Actions\Action::make('descargarPdf')
                         ->label('Solicitud PDF')
                         ->icon('heroicon-o-document-arrow-down')
                         ->color('danger')
                         ->action(fn(SolicitudPago $record) => app(SolicitudPagoReportService::class)->exportPdf($record)),
+                    Tables\Actions\Action::make('descargarPdfDetallado')
+                        ->label('Solicitud PDF Detallado')
+                        ->icon('heroicon-o-document-magnifying-glass')
+                        ->color('danger')
+                        ->action(fn(SolicitudPago $record) => app(SolicitudPagoReportService::class)->exportDetailedPdf($record)),
                     Tables\Actions\Action::make('descargarExcel')
                         ->label('Solicitud EXCEL')
                         ->icon('heroicon-o-table-cells')
                         ->color('success')
                         ->action(fn(SolicitudPago $record) => app(SolicitudPagoReportService::class)->exportExcel($record)),
+                    Tables\Actions\Action::make('descargarExcelDetallado')
+                        ->label('Solicitud EXCEL Detallado')
+                        ->icon('heroicon-o-table-cells')
+                        ->color('success')
+                        ->action(fn(SolicitudPago $record) => app(SolicitudPagoReportService::class)->exportDetailedExcel($record)),
                 ])
                     ->label('Descargar solicitud')
                     ->icon('heroicon-o-arrow-down-tray')

@@ -1092,7 +1092,7 @@ class RegistrarEgreso extends Page implements HasTable
                 ->action(function (): void {
                     try {
                         $reportContext = $this->registrarEgresoContable();
-                        $this->record->update(['estado' => 'GENERADO EGRESO']);
+                        $this->record->update(['estado' => 'FINALIZADO']);
                         $token = (string) Str::uuid();
 
                         Cache::put(
