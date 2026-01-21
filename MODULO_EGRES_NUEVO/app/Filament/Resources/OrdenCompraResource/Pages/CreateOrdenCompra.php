@@ -245,7 +245,9 @@ class CreateOrdenCompra extends CreateRecord
                 ];
             })->values()->toArray();
 
-            $this->data['detalles'] = $repeaterItems;
+            $existingItems = $this->data['detalles'] ?? [];
+            $mergedItems = $this->mergeDetalleItems($existingItems, $repeaterItems);
+            $this->data['detalles'] = $mergedItems;
 
             // Force recalculation of totals
             $subtotalGeneral = 0;
@@ -308,6 +310,53 @@ class CreateOrdenCompra extends CreateRecord
             ->filter(fn($pedido) => $pedido > 0)
             ->values()
             ->all();
+    }
+
+    private function mergeDetalleItems(array $existingItems, array $newItems): array
+    {
+        $merged = [];
+        $usedKeys = [];
+
+        foreach ($existingItems as $index => $item) {
+            $key = $this->detalleKey($item, $index);
+            $usedKeys[$key] = true;
+            $merged[] = $item;
+        }
+
+        foreach ($newItems as $index => $item) {
+            $key = $this->detalleKey($item, $index);
+            if (isset($usedKeys[$key])) {
+                continue;
+            }
+            $usedKeys[$key] = true;
+            $merged[] = $item;
+        }
+
+        return $merged;
+    }
+
+    private function detalleKey(array $item, int $index): string
+    {
+        $pedidoCodigo = $item['pedido_codigo'] ?? null;
+        $pedidoDetalleId = $item['pedido_detalle_id'] ?? null;
+
+        if ($pedidoCodigo && $pedidoDetalleId) {
+            return sprintf('pedido:%s:%s', $pedidoCodigo, $pedidoDetalleId);
+        }
+
+        $codigoProducto = $item['codigo_producto'] ?? null;
+        $bodega = $item['id_bodega'] ?? null;
+        $detalle = $item['detalle'] ?? null;
+        $descripcion = $item['producto'] ?? null;
+
+        return sprintf(
+            'manual:%s:%s:%s:%s:%s',
+            $index,
+            $codigoProducto,
+            $bodega,
+            $detalle,
+            $descripcion
+        );
     }
 
     private function resolveImportadoPorDetalle(array $pedidoDetallePairs): array
