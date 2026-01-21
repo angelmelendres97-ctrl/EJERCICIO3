@@ -304,14 +304,14 @@ class PresupuestoPagoProveedores extends Page implements HasForms
                 saedmcp.dmcp_num_fac    as numero_factura,
                 MIN(saedmcp.dcmp_fec_emis) as fecha_emision,
                 MAX(saedmcp.dmcp_fec_ven)  as fecha_vencimiento,
-                ABS(SUM(
-                        COALESCE(saedmcp.dcmp_deb_ml, 0)
-                        - COALESCE(saedmcp.dcmp_cre_ml, 0)
-                    )) as saldo
+                SUM(
+                    COALESCE(saedmcp.dcmp_deb_ml, 0)
+                    - COALESCE(saedmcp.dcmp_cre_ml, 0)
+                ) as saldo
                  ')
             ->groupBy('saedmcp.dmcp_cod_empr', 'saedmcp.dmcp_cod_sucu', 'saedmcp.clpv_cod_clpv', 'prov.clpv_nom_clpv', 'prov.clpv_ruc_clpv', 'saedmcp.dmcp_num_fac')
             ->orderBy('prov.clpv_nom_clpv')
-            ->havingRaw('SUM(COALESCE(saedmcp.dcmp_deb_ml,0) - COALESCE(saedmcp.dcmp_cre_ml,0)) <> 0');
+            ->havingRaw('SUM(COALESCE(saedmcp.dcmp_deb_ml,0) - COALESCE(saedmcp.dcmp_cre_ml,0)) < 0');
 
         return $query->get()
             ->reject(function ($row) use ($conexion, $registradas) {
@@ -730,7 +730,7 @@ class PresupuestoPagoProveedores extends Page implements HasForms
                         ->maxLength(255),
                 ])
                 ->action(fn(array $data) => $this->exportDetailedPdf($data['descripcion_reporte'] ?? '')),
-            Action::make('exportExcel')
+            /*  Action::make('exportExcel')
                 ->label('Exportar Excel')
                 ->icon('heroicon-o-table-cells')
                 ->color('success')
@@ -753,7 +753,7 @@ class PresupuestoPagoProveedores extends Page implements HasForms
                         ->required()
                         ->maxLength(255),
                 ])
-                ->action(fn(array $data) => $this->exportDetailedExcel($data['descripcion_reporte'] ?? '')),
+                ->action(fn(array $data) => $this->exportDetailedExcel($data['descripcion_reporte'] ?? '')), */
         ];
     }
 

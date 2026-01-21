@@ -1339,7 +1339,7 @@ class SolicitudPagoResource extends Resource
                         ->visible(fn(SolicitudPago $record) => in_array(strtoupper($record->estado ?? ''), ['APROBADA', 'BORRADOR', 'PENDIENTE'], true))
                         ->action(fn(SolicitudPago $record) => app(SolicitudPagoReportService::class)->exportDetailedPdf($record)),
 
-                    Tables\Actions\Action::make('descargarExcel')
+                   /*  Tables\Actions\Action::make('descargarExcel')
                         ->label('Solicitud EXCEL')
                         ->icon('heroicon-o-table-cells')
                         ->color('success')
@@ -1350,7 +1350,7 @@ class SolicitudPagoResource extends Resource
                         ->icon('heroicon-o-table-cells')
                         ->color('success')
                         ->visible(fn(SolicitudPago $record) => in_array(strtoupper($record->estado ?? ''), ['APROBADA', 'BORRADOR', 'PENDIENTE'], true))
-                        ->action(fn(SolicitudPago $record) => app(SolicitudPagoReportService::class)->exportDetailedExcel($record)),
+                        ->action(fn(SolicitudPago $record) => app(SolicitudPagoReportService::class)->exportDetailedExcel($record)), */
 
                     Tables\Actions\Action::make('gestionar')
                         ->label('Asignar abonos facturas')
